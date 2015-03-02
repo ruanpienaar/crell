@@ -1,0 +1,12 @@
+{application, crell,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { crell_app, []}},
+  {env, []}
+ ]}.
