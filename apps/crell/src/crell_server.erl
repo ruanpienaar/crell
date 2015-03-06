@@ -49,11 +49,6 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-% Match PID
-% handle_info({delivery, Pid, app, Curr, AppData},
-%             #?STATE{appmon_pid = Pid } = State) ->
-
-    % {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -63,17 +58,6 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
-% {ok,Serv} = appmon_info:start_link(node(), self(), []).
-% appmon_info:app(Serv, kernel, true, []).
-% flush().
-
-% Eshell V5.9  (abort with ^G)
-% 1> appmon_info:start_link(node(), self(), []).
-% {ok,<0.33.0>}
-% 2> appmon_info:app(pid(0,33,0), kernel, true, []).
-% ok
-% 3> flush().
 % Shell got {delivery,<0.33.0>,app,kernel,
 %                     {"<0.8.0>",
 %                      [{<0.12.0>,"global_name_server"},
