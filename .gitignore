@@ -13,3 +13,4 @@ deps/*
 *.log
 apps/*/logs
 Mnesia*% 
+*.png
