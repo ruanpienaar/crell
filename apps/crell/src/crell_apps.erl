@@ -70,7 +70,7 @@ terminate(Reason, _Req, _State) ->
     ok.
 
 to_json([],R) ->
-    jsx:encode ( lists:reverse(R) );
+    jsx:encode ( R );
 to_json([{AN,EV,AV}|T],R) ->
     to_json(T,[
         [

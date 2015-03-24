@@ -1,4 +1,12 @@
 <!DOCTYPE html>
+<html ng-app="CrellApp" >
+<head>
+    <title>Crell</title>
+    <script type="text/javascript" src="angular-1.3.9/angular.min.js">
+    </script>
+    <script type="text/javascript" src="js/main.js"></script>
+    </script>
+</head>
 <meta charset="utf-8">
 <style>
 
@@ -23,48 +31,32 @@
     }
 
 </style>
-<body>
+<body ng-controller="CrellController as ctrl">
 
-<form>
-    <select>
-        <option>Kernel</option>
-    </select>
-    <button>Update</button>
-</form>
+<div class="container">
+    <h2>Select app</h2>
+    <form>
+        <select id="otp_app" onchange="draw()">
+            <option ng-repeat="app in app_data" value="{{app.application_name}}">
+            {{app.application_name}}
+            </option>
+        </select>
+        <button onclick="draw()";
+         type="button">Update</button>
+    </form>
+</div>
 
-<script src="http://d3js.org/d3.v3.min.js"></script>
+<script type="text/javascript" src="js/jquery-1.11.2.min.js">
+</script>
+
+<script src="js/d3.v3.min.js"></script>
 <script>
-
-var w = window,
-        d = document,
-        e = d.documentElement,
-        g = d.getElementsByTagName('body')[0],
-        x = w.innerWidth || e.clientWidth || g.clientWidth,
-        y = w.innerHeight|| e.clientHeight|| g.clientHeight;
-
-var margin = {top: 20, right: 120, bottom: 20, left: 120},
-        width = x - margin.right - margin.left,
-        height = y - margin.top - margin.bottom;
-
-    var i = 0, duration = 500, root;
-
-    var tree = d3.layout.tree()
-        .size([height, width]);
-
-    var diagonal = d3.svg.diagonal()
-        .projection(function(d) { return [d.y, d.x]; });
-
-var svg = d3.select("body").append("svg")
-        .attr("width", width + margin.right + margin.left)
-        .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
 
 
 // resize graph on window resize:
-
-function updateWindow(){
+// TODO: still need to re-draw the graph, when you resize the
+// browser page.
+window.onresize = function updateWindow(svg){
     x = w.innerWidth || e.clientWidth || g.clientWidth;
     y = w.innerHeight|| e.clientHeight|| g.clientHeight;
     svg.attr("width", x).attr("height", y);
@@ -74,29 +66,59 @@ function updateWindow(){
         .attr("height", height + margin.top + margin.bottom)
       .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    alert('updated');
 }
-window.onresize = updateWindow;
+
+var w = window,
+        d = document,
+        e = d.documentElement,
+        g = d.getElementsByTagName('body')[0],
+        x = w.innerWidth || e.clientWidth || g.clientWidth,
+        y = w.innerHeight|| e.clientHeight|| g.clientHeight;
+
+    var margin = {top: 20, right: 120, bottom: 20, left: 120},
+            width = x - margin.right - margin.left,
+            height = y - margin.top - margin.bottom;
+
+    var i = 0, duration = 500, root;
+
+    var tree = d3.layout.tree()
+        .size([height, width]);
+
+    var diagonal = d3.svg.diagonal()
+        .projection(function(d) { return [d.y, d.x]; });
+
+    var svg = d3.select("body").append("svg")
+            .attr("width", width + margin.right + margin.left)
+            .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+function draw(){
 
 
 
-d3.json("crell_proc/data", function(error, flare) {
-  root = flare;
-  root.x0 = height / 2;
-  root.y0 = 0;
 
-  function collapse(d) {
-    if (d.children) {
-      d._children = d.children;
-      d._children.forEach(collapse);
-      d.children = null;
-    }
-  }
 
-  // root.children.forEach(collapse);
-  update(root);
-});
+    var app = $('#otp_app').val();
+    d3.json("crell_proc/data/" + app, function(error, flare) {
+      root = flare;
+      root.x0 = height / 2;
+      root.y0 = 0;
+      function collapse(d) {
+        if (d.children) {
+          d._children = d.children;
+          d._children.forEach(collapse);
+          d.children = null;
+        }
+      }
+      // root.children.forEach(collapse);
+      update(root);
+    });
+}
 
-d3.select(self.frameElement).style("height", "800px");
+// d3.select(self.frameElement).style("height", "800px");
 
 function update(source) {
 

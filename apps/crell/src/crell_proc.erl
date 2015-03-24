@@ -5,7 +5,7 @@
           terminate/3 ]).
 
 -define(STATE,crell_proc_state).
--record(?STATE,{}).
+-record(?STATE,{app_name}).
 
 %% All available REST handler exports:
  -export([
@@ -38,38 +38,32 @@
 %     variances/2              %% Methods : GET, HEAD, POST, PUT, PATCH, DELETE
  ]).
 
-%% Debug
-% -export([ ex/0
-%     ]).
-
-
--export([init/3,
-         content_types_provided/2,
-         handle_json/2
+-export([handle_json/2
         ]).
 
 init(_Transport, _Req, []) ->
     {upgrade, protocol, cowboy_rest}.
 
 rest_init(Req, _Opts) ->
-    {ok, Req, #?STATE{ } }.
+    {AppName, Req1} = cowboy_req:binding(app_name,Req),
+    {ok, Req1, #?STATE{ app_name = list_to_atom(binary_to_list(AppName)) } }.
 
 content_types_provided(Req, State) ->
     {[{<<"application/json">>, handle_json}], Req, State}.
 
 handle_json(Req, State) ->
-    {ok,Data} = crell_server:calc_app(kernel),
+    {ok,Data} = crell_server:calc_app(State#?STATE.app_name),
     Json = to_json(Data),
     {Json,Req,State}.
 
 terminate(normal, _Req, _State) ->
-    io:format("Terminate! ~p\n",[normal]),
+    % io:format("Terminate! ~p\n",[normal]),
     ok;
-terminate({crash, Class, Reason}, _Req, _State) ->
-    io:format("Terminate! ~p\n",[{crash, Class, Reason}]),
+terminate({crash, _Class, _Reason}, _Req, _State) ->
+    % io:format("Terminate! ~p\n",[{crash, Class, Reason}]),
     ok;
-terminate(Reason, _Req, _State) ->
-    io:format("Terminate! ~p\n",[Reason]),
+terminate(_Reason, _Req, _State) ->
+    % io:format("Terminate! ~p\n",[Reason]),
     ok.
 
 %          ---- two ---/--- four -- eight

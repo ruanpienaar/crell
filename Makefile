@@ -10,6 +10,7 @@ SCRIPT_PATH  := $(REL_DIR)/$(NODE)/bin/$(REL)
 .PHONY: rel offline compile get-deps update-deps test clean deep-clean
 
 rel: compile
+	@rebar escriptize
 	@rebar generate -f
 
 offline:
