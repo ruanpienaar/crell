@@ -22,10 +22,12 @@ routes() ->
     [
      {'_',
         [
+            {"/", cowboy_static, {priv_file, crell, "www/index.html"}},
             {"/crell_proc/data/:app_name", crell_proc, []},
-            {"/crell_proc/apps",           crell_apps, []},
-            {"/",                          cowboy_static, {priv_file, crell, "www/index.html"}},
-            {"/[...]",                     cowboy_static, {priv_dir, crell, "/www"}}
+            {"/crell_proc/apps", crell_apps, []},
+            {"/crell_crawl/dir/:dir_name", crell_crawl_dir, []},
+            {"/crell_crawl/dir/content/:file_name", crell_crawl_dir, []},
+            {"/[...]", cowboy_static, {priv_dir, crell, "/www"}}
         ]
      }
     ].

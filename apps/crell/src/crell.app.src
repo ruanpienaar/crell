@@ -10,7 +10,8 @@
                   cowlib,
                   cowboy,
                   jsx,
-                  lager
+                  lager,
+                  crell_crawl
                  ]},
   {mod, { crell_app, []}},
   {env, []}
