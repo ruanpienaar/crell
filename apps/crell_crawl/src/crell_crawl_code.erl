@@ -21,9 +21,10 @@ recurse_dir(Dir) ->
 recurse_dir(PreFixDir,Dir) ->
     DirName = last_dir(Dir),
     case DirName of
-        % Exclude later on...
-        % Exclude when Exclude =:= ".git" ->
-        %     [];
+        %% maybe make this configurable...
+        Exclude when Exclude =:= ".git";
+                     Exclude =:= ".svn" ->
+            [];
         _ ->
             case file:list_dir(Dir) of
                 {ok,Files} ->
