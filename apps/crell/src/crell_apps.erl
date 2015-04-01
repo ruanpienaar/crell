@@ -55,7 +55,8 @@ content_types_provided(Req, State) ->
 handle_json(Req, State) ->
     % [{stdlib,"ERTS  CXC 138 10","2.3"},
     %  {kernel,"ERTS  CXC 138 10","3.1"}]
-    AppList = application:which_applications(),
+%     AppList = application:which_applications(),
+    AppList = crell_server:remote_which_applications(),
     Json = to_json(AppList, []),
     {Json,Req,State}.
 
