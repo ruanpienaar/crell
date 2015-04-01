@@ -41,8 +41,7 @@ init({}) ->
     true = net_kernel:connect(Node),
 %     {ok,AppMonPid} = 
     rpc:call(Node,crell_appmon,start_appmon,[]),
-    {ok, #?STATE{appmon_pid = AppMonPid,
-                 node = Node}}.
+    {ok, #?STATE{node = Node}}.
 
 handle_call({app,App,Opts}, _From, #?STATE{ node = Node } = State) ->
     R = rpc:call(Node,crell_appmon,calc_app_tree,[App, Opts]),
