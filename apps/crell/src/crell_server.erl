@@ -33,7 +33,7 @@ calc_proc(Pid,Opts) ->
 %% ---------------------------------------
 
 init({}) ->
-    Node = application:get_env(crell, node),
+    {ok,Node} = application:get_env(crell, node),
     true = net_kernel:connect(Node),
     {ok,AppMonPid} = rpc:call(Node,crell_appmon,start_appmon,[]),
     {ok, #?STATE{appmon_pid = AppMonPid,
