@@ -9,7 +9,9 @@
 ]).
 
 start_appmon() ->
-    appmon_info:start_link(node(), self(), []).
+    %% Check erlang versions here...
+    appmon:start().
+    %% appmon_info:start_link(node(), self(), []).
 
 %%----------------------------------------------------------------------
 %%**********************************************************************
