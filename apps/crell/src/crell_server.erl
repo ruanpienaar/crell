@@ -15,8 +15,6 @@
                   node
                 }).
 
--record(db, {q, p, links, links2}).
-
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, {}, []).
 
