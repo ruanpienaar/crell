@@ -1,5 +1,7 @@
 -module(crell_appmon).
 
+-record(db, {q, p, links, links2}).
+
 -export([
     start_appmon/0,
     calc_app_tree/2,
