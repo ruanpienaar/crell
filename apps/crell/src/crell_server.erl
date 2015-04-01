@@ -11,7 +11,8 @@
 
 -define(SERVER, ?MODULE).
 -define(STATE, crell_server_state).
--record(?STATE, { appmon_pid
+-record(?STATE, { appmon_pid,
+                  node
                 }).
 
 -record(db, {q, p, links, links2}).
