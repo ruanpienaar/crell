@@ -39,7 +39,8 @@ remote_which_applications() ->
 init({}) ->
     {ok,Node} = application:get_env(crell, node),
     true = net_kernel:connect(Node),
-    {ok,AppMonPid} = rpc:call(Node,crell_appmon,start_appmon,[]),
+%     {ok,AppMonPid} = 
+    rpc:call(Node,crell_appmon,start_appmon,[]),
     {ok, #?STATE{appmon_pid = AppMonPid,
                  node = Node}}.
 
