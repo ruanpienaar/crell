@@ -5,6 +5,7 @@
          calc_proc/1,
          calc_proc/2
         ]).
+-export([remote_which_applications/0])
 
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -29,6 +30,9 @@ calc_proc(Pid) ->
 
 calc_proc(Pid,Opts) ->
     gen_server:call(?MODULE, {pid,Pid,Opts}).
+    
+remote_which_applications() ->
+   gen_server:call(?MODULE, remote_which_applications).
 
 %% ---------------------------------------
 
@@ -46,7 +50,11 @@ handle_call({pid,Pid,Opts}, _From, #?STATE{ node = Node } = State) ->
     R = rpc:call(Node,crell_appmon,calc_proc_tree,[Pid, Opts]),
     {reply, R, State};
 handle_call(_Request, _From, State) ->
-    {reply, {error, unknown_call, ?MODULE}, State}.
+    {reply, {error, unknown_call, ?MODULE}, State};
+
+handle_call(remote_which_applications, _From, #?STATE{ node = Node } = State) ->
+   Apps = rpc:call(Node, application, which_applications, []),
+   {reply,Apps,State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
