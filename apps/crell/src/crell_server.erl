@@ -49,12 +49,11 @@ handle_call({app,App,Opts}, _From, #?STATE{ node = Node } = State) ->
 handle_call({pid,Pid,Opts}, _From, #?STATE{ node = Node } = State) ->
     R = rpc:call(Node,crell_appmon,calc_proc_tree,[Pid, Opts]),
     {reply, R, State};
-handle_call(_Request, _From, State) ->
-    {reply, {error, unknown_call, ?MODULE}, State};
-
 handle_call(remote_which_applications, _From, #?STATE{ node = Node } = State) ->
    Apps = rpc:call(Node, application, which_applications, []),
-   {reply,Apps,State}.
+   {reply,Apps,State};
+handle_call(_Request, _From, State) ->
+    {reply, {error, unknown_call, ?MODULE}, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
