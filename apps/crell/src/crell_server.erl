@@ -3,7 +3,8 @@
          calc_app/1,
          calc_app/2,
          calc_proc/1,
-         calc_proc/2
+         calc_proc/2,
+         calc_app_env/1
         ]).
 -export([remote_which_applications/0]).
 
@@ -30,7 +31,10 @@ calc_proc(Pid) ->
 
 calc_proc(Pid,Opts) ->
     gen_server:call(?MODULE, {pid,Pid,Opts}).
-    
+   
+calc_app_env(AppName) ->
+   gen_server:call(?MODULE, {app_env,AppName}).
+   
 remote_which_applications() ->
    gen_server:call(?MODULE, remote_which_applications).
 
@@ -49,6 +53,9 @@ handle_call({app,App,Opts}, _From, #?STATE{ node = Node } = State) ->
 handle_call({pid,Pid,Opts}, _From, #?STATE{ node = Node } = State) ->
     R = rpc:call(Node,crell_appmon,calc_proc_tree,[Pid, Opts]),
     {reply, R, State};
+handle_call({app_env,AppName}, _From, #?STATE{ node = Node } = State) ->
+    AppEnv = rpc:call(Node, application, get_env, [AppName]),
+    {reply, AppEnv, State};
 handle_call(remote_which_applications, _From, #?STATE{ node = Node } = State) ->
    Apps = rpc:call(Node, application, which_applications, []),
    {reply,Apps,State};
