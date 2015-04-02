@@ -55,7 +55,7 @@ handle_call({pid,Pid,Opts}, _From, #?STATE{ node = Node } = State) ->
     {reply, R, State};
 handle_call({app_env,AppName}, _From, #?STATE{ node = Node } = State) ->
     AppEnv = rpc:call(Node, application, get_all_env, [AppName]),
-    {reply, AppEnv, State};
+    {reply, {ok,AppEnv}, State};
 handle_call(remote_which_applications, _From, #?STATE{ node = Node } = State) ->
    Apps = rpc:call(Node, application, which_applications, []),
    {reply,Apps,State};
