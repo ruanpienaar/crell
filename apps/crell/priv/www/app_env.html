@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html ng-app="CrellApp" >
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+	<meta name="description" content="">
+	<meta name="author" content="Ruan pienaar">
+	<link rel="icon" href="favicon.ico">
+	<title>Application Env</title>
+	<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+	<!-- Custom styles for this template -->
+	<link href="justified-nav.css" rel="stylesheet">
+	<script type="text/javascript" src="angular-1.3.9/angular.min.js">
+	</script>
+	<script type="text/javascript" src="js/main.js"></script>
+	</script>
+</head>
+<body ng-controller="CrellController as ctrl">
+    <div class="container">
+      <!-- The justified navigation menu is meant for single line per list item.
+           Multiple lines will require custom code not provided by Bootstrap. -->
+      <div class="masthead">
+        <h3 class="text-muted">crell</h3>
+        <nav>
+          <ul class="nav nav-justified">
+            <li><a href="index.html">Home</a></li>
+            <li class="active"><a href="sup_tree.html">Sup Tree</a></li>
+            <li><a href="code_tree.html">Code Browser</a></li>
+            <li><a href="#">...</a></li>
+            <li><a href="#">...</a></li>
+            <li><a href="#">...</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="jumbotron">
+        <h2>Application Env</h2>
+        <form>
+            <select id="otp_app" onchange="draw()">
+                <option ng-repeat="app in app_data" value="{{app.application_name}}">
+                {{app.application_name}}
+                </option>
+            </select>
+            <button onclick="draw()";
+             type="button">Update</button>
+        </form>
+        <script type="text/javascript" src="js/jquery-1.11.2.min.js">
+        </script>
+     </div>
+
+     <div id="appenv" class="container">
+     </div>
+
+     <script type="text/javascript">
+     	function draw(){
+     		$("g").click(function(e){
+                var name = e.target.nextElementSibling.innerHTML;
+                $.get( "/crell_crawl/app/env/"+name)
+                    .done(function( data ){
+                      //alert( "Data Loaded: " + data );
+                      $('#appenv').html(syntaxHighlight(data))
+                    })
+                    .fail(function() {
+                      //alert( "error" );
+                    })
+                    .always(function() {
+                      //alert( "finished" );
+                    });
+            });
+     	}
+
+     	function syntaxHighlight(json) {
+		    if (typeof json != 'string') {
+		         json = JSON.stringify(json, undefined, 2);
+		    }
+		    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+		    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+		        var cls = 'number';
+		        if (/^"/.test(match)) {
+		            if (/:$/.test(match)) {
+		                cls = 'key';
+		            } else {
+		                cls = 'string';
+		            }
+		        } else if (/true|false/.test(match)) {
+		            cls = 'boolean';
+		        } else if (/null/.test(match)) {
+		            cls = 'null';
+		        }
+		        return '<span class="' + cls + '">' + match + '</span>';
+		    });
+		}
+
+     </script>
+
+</body>
+</html>
