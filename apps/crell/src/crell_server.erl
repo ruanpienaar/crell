@@ -54,7 +54,7 @@ handle_call({pid,Pid,Opts}, _From, #?STATE{ node = Node } = State) ->
     R = rpc:call(Node,crell_appmon,calc_proc_tree,[Pid, Opts]),
     {reply, R, State};
 handle_call({app_env,AppName}, _From, #?STATE{ node = Node } = State) ->
-    AppEnv = rpc:call(Node, application, get_env, [AppName]),
+    AppEnv = rpc:call(Node, application, get_all_env, [AppName]),
     {reply, AppEnv, State};
 handle_call(remote_which_applications, _From, #?STATE{ node = Node } = State) ->
    Apps = rpc:call(Node, application, which_applications, []),
