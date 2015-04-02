@@ -64,7 +64,7 @@
 	            .done(function( data ){
 	              //alert( "Data Loaded: " + data );
 	              //$('#appenv').html(syntaxHighlight(data));
-	              $('#appenv').html('<pre><code class="html" >'+JSON.stringify(data)+'</code></pre>');
+	              $('#appenv').html('<pre><code class="html" >'+JSON.stringify(data, null, "\t")+'</code></pre>');
 	              $('pre code').each(function(i, block) {
 	                hljs.highlightBlock(block);
 	              });
