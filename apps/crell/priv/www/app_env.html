@@ -53,20 +53,18 @@
 
      <script type="text/javascript">
      	function draw(){
-     		$("g").click(function(e){
-                var name = e.target.nextElementSibling.innerHTML;
-                $.get( "/crell_crawl/app/env/"+name)
-                    .done(function( data ){
-                      //alert( "Data Loaded: " + data );
-                      $('#appenv').html(syntaxHighlight(data))
-                    })
-                    .fail(function() {
-                      //alert( "error" );
-                    })
-                    .always(function() {
-                      //alert( "finished" );
-                    });
-            });
+	        var name = $('#otp_app').val();
+	        $.get( "/crell_crawl/app/env/"+name)
+	            .done(function( data ){
+	              //alert( "Data Loaded: " + data );
+	              $('#appenv').html(syntaxHighlight(data))
+	            })
+	            .fail(function() {
+	              //alert( "error" );
+	            })
+	            .always(function() {
+	              //alert( "finished" );
+	            });
      	}
 
      	function syntaxHighlight(json) {
