@@ -53,8 +53,8 @@
         </script>
      </div>
 
-     <div class="container">
-     	<pre><code class="html" id="appenv"></code></pre>
+     <div class="container" id="appenv">
+     	
      </div>
 
      <script type="text/javascript">
@@ -64,7 +64,7 @@
 	            .done(function( data ){
 	              //alert( "Data Loaded: " + data );
 	              //$('#appenv').html(syntaxHighlight(data));
-	              $('#appenv').html(data);
+	              $('#appenv').html('<pre><code class="html" >'+data+'</code></pre>');
 	              $('pre code').each(function(i, block) {
 	                hljs.highlightBlock(block);
 	              });
