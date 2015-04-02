@@ -57,7 +57,10 @@
 	        $.get( "/crell_crawl/app/env/"+name)
 	            .done(function( data ){
 	              //alert( "Data Loaded: " + data );
-	              $('#appenv').html(syntaxHighlight(data))
+	              //$('#appenv').html(syntaxHighlight(data));
+	              $('#appenv').html(
+	              	JSON.stringify(data, null, 4)
+	              );
 	            })
 	            .fail(function() {
 	              //alert( "error" );
