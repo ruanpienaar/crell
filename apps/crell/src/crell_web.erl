@@ -27,7 +27,7 @@ routes() ->
             {"/crell_proc/apps", crell_apps, []},
             {"/crell_crawl/dir/:dir_name", crell_crawl_dir, []},
             {"/crell_crawl/dir/content/:file_name", crell_crawl_dir, []},
-            {"/crell_crawl/app/env/:file_name", crell_app_env, []},
+            {"/crell_crawl/app/env/:app_name", crell_app_env, []},
             {"/[...]", cowboy_static, {priv_dir, crell, "/www"}}
         ]
      }
