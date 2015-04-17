@@ -44,17 +44,38 @@ remote_which_applications() ->
 init({}) ->
     {ok,Node} = application:get_env(crell, remote_node),
     {ok,Cookie} = application:get_env(crell, remote_cookie),
-    case erlang:set_cookie(Node,Cookie) of 
-    	true ->
-    		true = net_kernel:connect(Node),
-		    rpc:call(Node,crell_appmon,start_appmon,[]),
-		    {ok, #?STATE{
-		    	remote_node = Node,
-		    	remote_node_cookie = Cookie
-		    }};
-		false ->
-			{stop, {enoconnect,[{node,Node},{cookie,Cookie}]}}
+    {_, _} = est_rem_conn(Node, Cookie).
+	
+est_rem_conn(Node, COokie) ->
+	case ((erlang:set_cookie(Node,Cookie)) andalso (net_kernel:connect(Node, Cookie))) of
+        true ->
+		    start_remote_code(Node, Cookie);
+        false ->
+            {stop, {enoconnect,[{node,Node},{cookie,Cookie}]}}
+    end.
+
+start_remote_code(Node,Cookie) ->
+	case application:get_env(crell, remote_action) of
+		1 ->
+			% try loading
+			inject_module(crell_appmon,Node),
+			rpc:call(Node, crell_appmon, start_appmon, []),
+			{ok,state(Node, Cookie)};
+		2 ->[B
+			% try lib
+			rpc:call(Node, crell_appmon, start_appmon, []),
+			{ok,state(Node, Cookie)};
+		3 ->
+			% try loading, then lib,
+			%% case inject_module(crell_appmon,Node) of 
+			
+			{ok,state(Node, Cookie)};
+		undefined ->
+			{ok,state(Node, Cookie)}
 	end.
+
+state(Node, Cookie) ->
+	#?STATE{remote_node=Node, remote_node_cookie=Cookie}.
 
 handle_call({app,App,Opts}, _From, #?STATE{ remote_node = Node } = State) ->
     R = rpc:call(Node,crell_appmon,calc_app_tree,[App, Opts]),
@@ -82,3 +103,30 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+-spec inject_module(ModName :: term(), NodeName :: atom()) ->
+                                        ok | {error, Reason :: term()}.
+inject_module(ModName, NodeName) ->
+    lager:info("Inject the agent code into the node (NodeName=~p, "
+               "Agent=~p)", [NodeName, ModName]),
+    case code:get_object_code(ModName) of
+        {ModName, Bin, File} ->
+            case rpc:call(NodeName, code, load_binary,
+                          [ModName, File, Bin]) of
+                {module, ModName} ->
+                    purge_module(NodeName, ModName), % remove old code of module code
+                    lager:info("Agent injected (NodeName=~p, Agent=~p)",
+                               [NodeName, ModName]),
+                    ok;
+                {Error, Reason} when Error =:= error;
+                                     Error =:= badrpc ->
+                    lager:error("rpc(~p, code, load_binary, ...) "
+                                "failed (ModName=~p, Reason=~p)",
+                                [NodeName, ModName, Reason]),
+                    {error, {load_binary_failed, Reason}}
+            end;
+        error ->
+            lager:error("code:get_object_code failed (ModName=~p)",
+                        [ModName]),
+            {error, {get_object_code_failed, ModName}}
+    end.
