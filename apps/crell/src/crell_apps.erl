@@ -1,6 +1,6 @@
 -module(crell_apps).
 
--export([ init/3,
+-export([ init/2,
           rest_init/2,
           terminate/3 ]).
 
