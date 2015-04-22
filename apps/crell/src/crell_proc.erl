@@ -1,6 +1,6 @@
 -module(crell_proc).
 
--export([ init/3,
+-export([ init/2,
           rest_init/2,
           terminate/3 ]).
 
@@ -41,7 +41,7 @@
 -export([handle_json/2
         ]).
 
-init(_Transport, _Req, []) ->
+init(_Req, []) ->
     {upgrade, protocol, cowboy_rest}.
 
 rest_init(Req, _Opts) ->
