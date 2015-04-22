@@ -38,8 +38,7 @@
 %     variances/2              %% Methods : GET, HEAD, POST, PUT, PATCH, DELETE
  ]).
 
--export([init/3,
-         content_types_provided/2,
+-export([
          handle_json/2
         ]).
 
