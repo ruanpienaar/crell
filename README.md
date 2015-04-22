@@ -1,4 +1,4 @@
-Crawl Erlang Source Code ( cr - ell )
+Crawl Erlang Source Code
 ===
 
 1) clone repo
