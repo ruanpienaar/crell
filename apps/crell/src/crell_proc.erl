@@ -1,7 +1,6 @@
 -module(crell_proc).
 
 -export([ init/2,
-          rest_init/2,
           terminate/3,
           content_types_provided/2 %% Methods : GET, HEAD, POST, PUT, PATCH, DELETE
 ]).
@@ -16,8 +15,8 @@ init(Req, Opts) ->
     {cowboy_rest, Req, Opts}.
 
 content_types_provided(Req, State) ->
-    {AppName, Req1} = cowboy_req:binding(app_name,Req),
-    {[{<<"application/json">>, handle_json}], Req1, #?STATE{ app_name = list_to_atom(binary_to_list(AppName)) }}.
+    AppName = cowboy_req:binding(app_name,Req),
+    {[{<<"application/json">>, handle_json}], Req, #?STATE{ app_name = list_to_atom(binary_to_list(AppName)) }}.
 
 handle_json(Req, State) ->
     {ok,Data} = crell_server:calc_app(State#?STATE.app_name),

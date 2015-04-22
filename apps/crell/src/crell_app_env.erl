@@ -12,8 +12,9 @@ init(Req, Opts) ->
     {cowboy_rest, Req, Opts}.
 
 content_types_provided(Req, State) ->
-    {AppName, Req1} = cowboy_req:binding(app_name,Req),
-    {[{<<"application/json">>, handle_json}], Req1, #?STATE{ app_name = list_to_atom(binary_to_list(AppName)) }}.
+	io:format("State : ~p\n",[State]),
+    AppName = cowboy_req:binding(app_name,Req),
+    {[{<<"application/json">>, handle_json}], Req, #?STATE{ app_name = list_to_atom(binary_to_list(AppName)) }}.
 
 handle_json(Req, State) ->
     {ok,Data} = crell_server:calc_app_env(State#?STATE.app_name),
