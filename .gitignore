@@ -15,4 +15,3 @@ apps/*/logs
 Mnesia*% 
 *.png
 rel/crell
-extract_png/*.png
