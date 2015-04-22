@@ -5,6 +5,7 @@
 
 start() ->
     {ok,Port} = port(),
+    io:format("......\nStarting cowboy on ~p\n......\n",[Port]),
     Routes    = routes(),
     Dispatch  = cowboy_router:compile(Routes),
     {ok, Pid} = cowboy:start_http(http,
@@ -42,10 +43,8 @@ stop(Pid) ->
 
 
 % TODO: maybe just show interesting apps,
-
  % rp ( [ crell_server:calc_proc(pid(0,X,0)) || X <- lists:seq(1,32767) ] ).
 
 %% and filter out these ( NON interesting apps )
-
  %  {ok,{"<0.32496.0>",[{<0.32496.0>,"<0.32496.0>"}],[],[]}},
  % {ok,{"<0.32497.0>",[{<0.32497.0>,"<0.32497.0>"}],[],[]}},

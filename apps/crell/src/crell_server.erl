@@ -46,8 +46,8 @@ init({}) ->
     {ok,Cookie} = application:get_env(crell, remote_cookie),
     {_, _} = est_rem_conn(Node, Cookie).
 	
-est_rem_conn(Node, COokie) ->
-	case ((erlang:set_cookie(Node,Cookie)) andalso (net_kernel:connect(Node, Cookie))) of
+est_rem_conn(Node, Cookie) ->
+	case ((erlang:set_cookie(Node,Cookie)) andalso (net_kernel:connect(Node))) of
         true ->
 		    start_remote_code(Node, Cookie);
         false ->
@@ -55,20 +55,26 @@ est_rem_conn(Node, COokie) ->
     end.
 
 start_remote_code(Node,Cookie) ->
-	case application:get_env(crell, remote_action) of
+	{ok,V} = application:get_env(crell, remote_action),
+	case V of 
 		1 ->
-			% try loading
-			inject_module(crell_appmon,Node),
-			rpc:call(Node, crell_appmon, start_appmon, []),
-			{ok,state(Node, Cookie)};
-		2 ->[B
-			% try lib
-			rpc:call(Node, crell_appmon, start_appmon, []),
+			% try loading module
+			case inject_module(crell_appmon, Node) of 
+				ok ->			
+					%% TODO: know that it's started properly
+					rpc:call(Node, crell_appmon, start_appmon, []),
+					{ok,state(Node, Cookie)};
+				_ ->
+					{stop, enotloaded}
+			end;
+		2 ->
+			% TODO: try lib
+			%% rpc:call(Node, crell_appmon, start_appmon, []),
 			{ok,state(Node, Cookie)};
 		3 ->
-			% try loading, then lib,
+			% TODO: try loading, then lib,
 			%% case inject_module(crell_appmon,Node) of 
-			
+			%%% TODO: complete it
 			{ok,state(Node, Cookie)};
 		undefined ->
 			{ok,state(Node, Cookie)}
@@ -129,4 +135,38 @@ inject_module(ModName, NodeName) ->
             lager:error("code:get_object_code failed (ModName=~p)",
                         [ModName]),
             {error, {get_object_code_failed, ModName}}
+    end.
+    
+  purge_module(Node, Module) ->
+    Res = try rpc:call(Node, code, soft_purge, [Module]) of
+              true ->
+                  ok;
+              false ->
+                  hard_purge_module(Node, Module);
+              {badrpc, _} = RPCError ->
+                  {error, RPCError}
+          catch
+              C:E ->
+                  {error, {C,E}}
+          end,
+    case Res of
+        ok ->
+            lager:info("Purged ~p from ~p", [Module, Node]);
+        {error, Error} ->
+            lager:error("Error while purging  ~p from ~p: ~p", [Module, Node, Error])
+    end,
+    ok.
+
+hard_purge_module(Node, Module) ->
+    try rpc:call(Node, code, purge, [Module]) of
+        true ->
+            lager:info("Purging killed processes on ~p while loading ~p", [Node, Module]),
+            ok;
+        false ->
+            ok;
+        {badrpc, _} = RPCError ->
+            {error, RPCError}
+    catch
+        C:E ->
+            {error, {C,E}}
     end.
