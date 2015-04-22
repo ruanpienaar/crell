@@ -41,7 +41,7 @@
 -export([handle_json/2
         ]).
 
-init(_Transport, _Req, []) ->
+init(_Req, []) ->
     {upgrade, protocol, cowboy_rest}.
 
 rest_init(Req, _Opts) ->
