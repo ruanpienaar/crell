@@ -25,5 +25,9 @@ Create graphs of Erlang callgraph using xref.
 ===
 
 ./extract.sh $DIR
-
 * $DIR containing (src/*.erl) folders.
+* 
+Future work
+===
+
+- extending the crawling with either etdd and/or RefactorErl, or some smart tool.
