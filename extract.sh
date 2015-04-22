@@ -5,5 +5,5 @@
 
 for DIR in `ls $1`; do
     echo $DIR
-    ./deps/grapherl/grapherl -m "$1"/"$DIR" $DIR.png
+    ./deps/grapherl/grapherl -m "$1"/"$DIR" "extract_png/$DIR.png"
 done

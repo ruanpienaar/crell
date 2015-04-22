@@ -11,6 +11,7 @@ SCRIPT_PATH  := $(REL_DIR)/$(NODE)/bin/$(REL)
 
 rel: compile
 	@rebar generate -f
+	@cd deps/grapherl/ ; rebar escriptize
 
 offline:
 	@rebar compile

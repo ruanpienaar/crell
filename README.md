@@ -24,6 +24,6 @@ http://localhost:8080/
 Create graphs of Erlang callgraph using xref.
 ===
 
-./generate $DIR
+./extract.sh $DIR
 
-* $DIR containing src/*.erl folder.
+* $DIR containing (src/*.erl) folders.
