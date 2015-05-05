@@ -62,10 +62,15 @@
 	        var name = $('#otp_app').val();
 	        $.get( "/crell_crawl/app/env/"+name)
 	            .done(function( data ){
-	              //alert( "Data Loaded: " + data );
-	              //$('#appenv').html(syntaxHighlight(data));
-	              $('#appenv').html('<pre><code class="html" >'+JSON.stringify(data, null, "\t")+'</code></pre>');
+	              //$('#appenv').html('<pre><code class="html" >'+JSON.stringify(data, null, "\t")+'</code></pre>');
+                //$('#appenv').html('<pre><code class="html" >'+data+'</code></pre>');
+                $('#appenv').html('<pre><code class="html" >'+data.replace(/\n/, "\\n")+'</code></pre>');
 	              $('pre code').each(function(i, block) {
+                  hljs.configure({
+                    tabReplace: '    ', // 4 spaces
+                    useBR: 'true'
+                  })
+                  hljs.initHighlighting();
 	                hljs.highlightBlock(block);
 	              });
 	            })
