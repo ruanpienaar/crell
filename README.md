@@ -25,7 +25,7 @@ Create graphs of Erlang callgraph using xref.
 ===
 
 ./extract.sh $DIR
-* $DIR containing (src/*.erl) folders.
+* $DIR containing (ebin/*.beam) folders.
 
 Future work
 ===
