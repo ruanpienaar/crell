@@ -1,27 +1,40 @@
--module(_tests).
-%%-author('').
-
--define(NOTEST, true).
--define(NOASSERT, true).
+-module(crell_tests).
 -include_lib("eunit/include/eunit.hrl").
 
--define(MODNAME, ).
-%%%.
-%%%' TEST GENERATOR
-%% @spec _test_() -> List
-%% where
-%%       List = [term()]
-_test_() ->
-  %% add your asserts in the returned list, e.g.:
-  %% [
-  %%   ?assert(?MODNAME:double(2) =:= 4),
-  %%   ?assertMatch({ok, Pid}, ?MODNAME:spawn_link()),
-  %%   ?assertEqual("ba", ?MODNAME:reverse("ab")),
-  %%   ?assertError(badarith, ?MODNAME:divide(X, 0)),
-  %%   ?assertExit(normal, ?MODNAME:exit(normal)),
-  %%   ?assertThrow({not_found, _}, ?MODNAME:func(unknown_object))
-  %% ]
-  [].
-%%%.
-%%% vim: set filetype=erlang tabstop=2 foldmarker=%%%',%%%. foldmethod=marker:
+% -----------------------------------------------------
+
+crell_test_() ->
+	{setup,
+		fun setup/0,
+		fun cleanup/1,
+		[
+			{"all_mods",				fun crell_mods_all/0},
+			{"find module",				fun crell_mods_find/0}.
+			{"Get module's Call Graph", fun crell_mods_follow/0}
+		]
+	}.
+
+% -----------------------------------------------------
+
+setup() ->
+	ok.
+
+cleanup(_Pid) ->
+	ok.
+
+% -----------------------------------------------------
+
+crell_mods_all() ->
+	All = crell_mods:all(),
+	?assert(is_list(All)),
+	?assert({erlang, preloaded} == lists:keyfind(erlang, 1, All)),
+	{lists,AbsPath} = lists:keyfind(lists, 1, All),
+	?assert(is_list(AbsPath)).
+
+crell_mods_find() ->
+	{lists, AbsPath} = crell_mods:find(lists),
+	?assert(is_list(AbsPath)).
+
+crell_mods_follow() ->
+	true.
 
