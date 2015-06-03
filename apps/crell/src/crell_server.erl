@@ -4,9 +4,14 @@
          calc_app/2,
          calc_proc/1,
          calc_proc/2,
-         calc_app_env/1
-        ]).
--export([remote_which_applications/0]).
+         calc_app_env/1,
+         remote_which_applications/0,
+         make_xref/0
+]).
+-export([
+    runtime_modules/0,
+    module_source/1
+]).
 
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -38,6 +43,9 @@ calc_app_env(AppName) ->
    
 remote_which_applications() ->
    gen_server:call(?MODULE, remote_which_applications).
+
+runtime_modules() ->
+    gen_server:call(?MODULE, runtime_modules).
 
 %% ---------------------------------------
 
@@ -94,7 +102,10 @@ handle_call({app_env,AppName}, _From, #?STATE{ remote_node = Node } = State) ->
     {reply, {ok,AppEnv}, State};
 handle_call(remote_which_applications, _From, #?STATE{ remote_node = Node } = State) ->
    Apps = rpc:call(Node, application, which_applications, []),
-   {reply,Apps,State};
+   {reply, Apps, State};
+handle_call(runtime_modules, _From, #?STATE{ remote_node = Node } = State) ->
+    Modules = rpc:call(Node, code, all_loaded, []),
+    {reply, Modules, State};
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call, ?MODULE}, State}.
 
@@ -170,3 +181,43 @@ hard_purge_module(Node, Module) ->
         C:E ->
             {error, {C,E}}
     end.
+
+%% This is to follow a function to another....
+make_xref() ->
+    ok.
+
+module_functions(Mod) ->
+    Exports = Mod:module_info(exports),
+    Unexported = [F || F <- Mod:module_info(functions), not lists:member(F, Exports)],
+    {Mod, Exports, Unexported}.
+
+module_source(Module) ->
+  get_source(Module).
+
+-spec abstract_code(module()) -> [erl_parse:abstract_form()].
+abstract_code(Module) ->
+        File = code:which(Module),
+        {ok,{_Mod,[{abstract_code,{_Version,Forms}}]}} = beam_lib:chunks(File, [abstract_code]),
+        Forms.
+ 
+mod_src(Module) ->
+    Forms = abstract_code(Module),
+    lists:flatten([[erl_pp:form(F),$\n] || F <- Forms, element(1,F) =:= attribute orelse element(1,F) =:= function]).
+ 
+fun_src(Mod, Fun, Arity) ->
+    Forms = abstract_code(Mod),
+    [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
+    lists:flatten(erl_pp:form(FF)).
+ 
+-spec get_source(module() | {module(), function(), Arity :: non_neg_integer()}) -> {ok, string()} | {error, Reason :: any()}.
+get_source(What) ->
+        try
+        case What of
+                {M,F,A} ->
+                        {ok, fun_src(M,F,A)};
+                Mod when is_atom(Mod)->
+                        {ok, mod_src(Mod)}
+        end
+        catch _:E ->
+                {error, E}
+        end.

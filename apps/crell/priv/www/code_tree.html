@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" ng-app="CrellApp">
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -42,10 +42,9 @@
         <script src="http://d3js.org/d3.v3.min.js"></script>
 
     </head>
-    <body>
+    <body ng-controller="CrellController as ctrl">
 
        <div class="container">
-
       <!-- The justified navigation menu is meant for single line per list item.
            Multiple lines will require custom code not provided by Bootstrap. -->
       <div class="masthead">
@@ -63,7 +62,15 @@
       </div>
 
       <div class="jumbotron">
+          <p>Modules</p>
+              <div ng-repeat="mod in mods" ><!--  value="{{app.application_name}}" -->
+              {{app.mod}}
+              </div>
+      </div>
 
+      <div class="jumbotron">
+
+        <p>Code Folder Browser...</p>
         <p>Enter path:</p>
         <p><input size="100" type="text" id="path" placeholder="/enter/dir/to/somewhere" /></p>
         <p>

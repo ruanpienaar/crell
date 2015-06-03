@@ -28,6 +28,13 @@ recurse_dir(PreFixDir,Dir) ->
         _ ->
             case file:list_dir(Dir) of
                 {ok,Files} ->
+
+                    %% abstract the json creation to a function,
+                    %% and return a erlang TERM as the DIR Tree.
+
+                    %% Use a Include(dirs/files), Exclude(dirs/files) Opts list,
+                    %% ideally this should be a REGEXP
+
                     [{name,strip_prefix(PreFixDir,Dir)},
                      {children,
                         [begin
@@ -35,12 +42,7 @@ recurse_dir(PreFixDir,Dir) ->
                                  false -> [{name,strip_prefix(PreFixDir,File)}];
                                  true  -> recurse_dir(PreFixDir, Dir++"/"++File)
                             end
-                        end
-                        || File <- Files
-                            % Exclude later on...
-                            % , File =/= ".git"
-                            , File =/= DirName
-                        ]
+                        end || File <- Files , File =/= DirName]
                     }];
                 {error,enotdir} -> % trying to list a list_dir a file
                     io:format("\n Dir : ~p ERROR ~p \n",[Dir,enotdir]),
