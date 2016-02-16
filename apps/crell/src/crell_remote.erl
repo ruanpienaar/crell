@@ -1,17 +1,58 @@
--module(crell_appmon).
+-module(crell_remote).
 
 -record(db, {q, p, links, links2}).
 
+%% Handling:
+-export([init/0]).
+
+%% Remote Loaded Code
+-export([
+    loaded_code/0
+]).
+
+%% Supervision diagram
 -export([
     start_appmon/0,
     calc_app_tree/2,
     calc_proc_tree/2
 ]).
 
+%% Tracing:
+-export([
+    trace/3
+]).
+
+%%----------------------------------------------------------------------
+
+%% TODO: check the type proplist here....
+-spec init() -> {ok, proplists:proplist()}.
+init() ->
+    {ok, Pid} = start_appmon(),
+    RMs = loaded_code(),
+    RRAs = application:which_applications(),
+
+    % [ application:get_all_env(App) || App <- RRAs ]
+    % RAe = application:get_all_env(),
+
+    RemoteState = [
+        {rmeote_appmon_pid, Pid},
+        {remote_modules, RMs},
+        {remote_running_applications, RRAs},
+        {remote_all_env, [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ]}
+    ],
+    {ok, RemoteState}.
+
+%%----------------------------------------------------------------------
+
+loaded_code() ->
+    [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
+
+%%----------------------------------------------------------------------
+
 start_appmon() ->
     %% Check erlang versions here...
-    appmon:start().
-    %% appmon_info:start_link(node(), self(), []).
+    %% appmon:start().
+    appmon_info:start_link(node(), self(), []).
 
 %%----------------------------------------------------------------------
 %%**********************************************************************
@@ -363,3 +404,15 @@ format(X) ->
 %%**********************************************************************
 %%----------------------------------------------------------------------
 
+
+trace(M, F, _A) ->
+
+    %% TODO: i',m not going to build yet another tracing tool!!!
+
+    % dbg:tracer().
+    % dbg:p(all, call).
+    % dbg:tpl(M, F, [ {'_',[],[ {message, {return_trace}} ]} ]).
+
+    %% TODO: Rather use Eper!!!!!!
+
+    ok.

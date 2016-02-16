@@ -14,11 +14,11 @@ init(Req, Opts) ->
 	AppName = cowboy_req:binding(app_name,Req),
     {cowboy_rest, Req, #?STATE{ app_name = list_to_atom(binary_to_list(AppName)) }}.
 
-content_types_provided(Req, State) ->	
+content_types_provided(Req, State) ->
 	{[{<<"application/json">>, handle_json}], Req, State}.
 
 handle_json(Req, State) ->
-    {ok,Data} = crell_server:calc_app_env(State#?STATE.app_name),
+    Data = crell_server:calc_app_env(State#?STATE.app_name),
     Json = to_json(State#?STATE.app_name, Data),
     {Json,Req,State}.
 
@@ -57,11 +57,11 @@ parsable(Data) when is_list(Data) ->
 parsable_key_value({Key, Value=[]}, Acc) when is_atom(Key) andalso is_list(Value) ->
     [{Key, []} | Acc];
 parsable_key_value({Key, Value}, Acc) when is_atom(Key) andalso is_list(Value) ->
-    case io_lib:printable_unicode_list(Value) andalso io_lib:printable_list(Value) of 
+    case io_lib:printable_unicode_list(Value) andalso io_lib:printable_list(Value) of
         true ->
             [{Key, list_to_binary(Value)} | Acc];
         false ->
-            case Value of 
+            case Value of
                 L when is_list(L) ->
                    [{Key,
                     lists:reverse(
@@ -95,18 +95,3 @@ parsable_key_value({Key, Value}, Acc) when is_binary(Key) ->
 %% for valid json
 parsable_key_value(KV, Acc) when is_tuple(KV) andalso size(KV) > 2 ->
     [{element(1,KV), [ element(X,KV) || X <- lists:seq(2,size(KV)) ]}|Acc].
-
-% ParsableData : [{dsp_info,[{dsp,dsp7,"localhost",25438,3},
-%                            {dsp,dsp8,"localhost",25439,3},
-%                            {dsp,dsp9,"localhost",25440,3}]},
-%                 {conn_restart_delay,10000},
-%                 {request_attempts,2},
-%                 {request_timeout,2000},
-%                 {queue_check_interval,2},
-%                 {recv_timeout,1800},
-%                 {disable_message_signing,false},
-%                 {conn_timeout,2000},
-%                 {included_applications,[]},
-%                 {key_info_path,<<"X509SubjectName">>},
-%                 {max_queue_size,2000},
-%                 {signature_tag,<<"Sgntr">>}]

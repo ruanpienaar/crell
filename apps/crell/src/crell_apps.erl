@@ -18,15 +18,16 @@ content_types_provided(Req, State) ->
     {[{<<"application/json">>, handle_json}], Req, State}.
 
 handle_json(Req, State) ->
-    AppList = crell_server:remote_which_applications(),
+    {remote_running_applications, AppList}
+        = crell_server:remote_which_applications(),
     Json = to_json(AppList, []),
     {Json,Req,State}.
 
 terminate(normal, _Req, _State) ->
     ok;
-terminate({crash, Class, Reason}, _Req, _State) ->
+terminate({crash, _Class, _Reason}, _Req, _State) ->
     ok;
-terminate(Reason, _Req, _State) ->
+terminate(_Reason, _Req, _State) ->
     ok.
 
 to_json([],R) ->

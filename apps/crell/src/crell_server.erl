@@ -10,8 +10,17 @@
 ]).
 -export([
     runtime_modules/0,
-    module_source/1
+    module_source/1,
+    trace/1,
+    % trace/2,
+    trace/5,
+    redbug_trace_pattern/5
 ]).
+% -export([
+%     create_fd/0,
+%     listen_accept/0
+% ]).
+%-export([format_handler/4]).
 
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -20,7 +29,9 @@
 -define(STATE, crell_server_state).
 -record(?STATE, { appmon_pid,
                   remote_node,
-                  remote_node_cookie
+                  remote_node_cookie,
+                  %% TODO: create type for remote state
+                  remote_state = []
                 }).
 
 start_link() ->
@@ -37,15 +48,32 @@ calc_proc(Pid) ->
 
 calc_proc(Pid,Opts) ->
     gen_server:call(?MODULE, {pid,Pid,Opts}).
-   
+
 calc_app_env(AppName) ->
    gen_server:call(?MODULE, {app_env,AppName}).
-   
+
 remote_which_applications() ->
    gen_server:call(?MODULE, remote_which_applications).
 
 runtime_modules() ->
     gen_server:call(?MODULE, runtime_modules).
+
+trace(M) when is_atom(M) ->
+    trace(M, all_functions, all_arities, "", return_stack).
+
+% trace(M, F) when is_atom(M), is_atom(F) ->
+%     trace(M, F, all_arities, return_stack).
+
+trace(M, F, A, G, R)
+%% when is_list(M) and is_list(F)
+                            % and ( is_integer(A) or is_list(A) )
+                          %% and is_list(G)
+                          % and
+                          % ( (R == return) or
+                          %   (R == stack) or
+                          %   (R == return_stack) )
+                          ->
+    gen_server:call(?MODULE, {trace, M, F, A, G, R}).
 
 %% ---------------------------------------
 
@@ -53,7 +81,7 @@ init({}) ->
     {ok,Node} = application:get_env(crell, remote_node),
     {ok,Cookie} = application:get_env(crell, remote_cookie),
     {_, _} = est_rem_conn(Node, Cookie).
-	
+
 est_rem_conn(Node, Cookie) ->
 	case ((erlang:set_cookie(Node,Cookie)) andalso (net_kernel:connect(Node))) of
         true ->
@@ -64,24 +92,25 @@ est_rem_conn(Node, Cookie) ->
 
 start_remote_code(Node,Cookie) ->
 	{ok,V} = application:get_env(crell, remote_action),
-	case V of 
+	case V of
 		1 ->
 			% try loading module
-			case inject_module(crell_appmon, Node) of 
-				ok ->			
+			case inject_module(crell_remote, Node) of
+				ok ->
 					%% TODO: know that it's started properly
-					rpc:call(Node, crell_appmon, start_appmon, []),
-					{ok,state(Node, Cookie)};
+                    %% TODO: build a funtion, to refresh remote state...
+					{ok, RemoteState} = rpc:call(Node, crell_remote, init, []),
+					{ok,state(Node, Cookie, RemoteState)};
 				_ ->
 					{stop, enotloaded}
 			end;
 		2 ->
 			% TODO: try lib
-			%% rpc:call(Node, crell_appmon, start_appmon, []),
+			%% rpc:call(Node, crell_remote, init, []),
 			{ok,state(Node, Cookie)};
 		3 ->
 			% TODO: try loading, then lib,
-			%% case inject_module(crell_appmon,Node) of 
+			%% case inject_module(crell_remote,Node) of
 			%%% TODO: complete it
 			{ok,state(Node, Cookie)};
 		undefined ->
@@ -89,23 +118,49 @@ start_remote_code(Node,Cookie) ->
 	end.
 
 state(Node, Cookie) ->
-	#?STATE{remote_node=Node, remote_node_cookie=Cookie}.
+	state(Node, Cookie, []).
+
+state(Node, Cookie, RemoteState) when is_list(RemoteState) ->
+    #?STATE{remote_node=Node,
+            remote_node_cookie=Cookie,
+            remote_state=RemoteState}.
 
 handle_call({app,App,Opts}, _From, #?STATE{ remote_node = Node } = State) ->
-    R = rpc:call(Node,crell_appmon,calc_app_tree,[App, Opts]),
+    R = rpc:call(Node,crell_remote,calc_app_tree,[App, Opts]),
     {reply, R, State};
 handle_call({pid,Pid,Opts}, _From, #?STATE{ remote_node = Node } = State) ->
-    R = rpc:call(Node,crell_appmon,calc_proc_tree,[Pid, Opts]),
+    R = rpc:call(Node,crell_remote,calc_proc_tree,[Pid, Opts]),
     {reply, R, State};
-handle_call({app_env,AppName}, _From, #?STATE{ remote_node = Node } = State) ->
-    AppEnv = rpc:call(Node, application, get_all_env, [AppName]),
-    {reply, {ok,AppEnv}, State};
-handle_call(remote_which_applications, _From, #?STATE{ remote_node = Node } = State) ->
-   Apps = rpc:call(Node, application, which_applications, []),
-   {reply, Apps, State};
-handle_call(runtime_modules, _From, #?STATE{ remote_node = Node } = State) ->
-    Modules = rpc:call(Node, code, all_loaded, []),
-    {reply, Modules, State};
+handle_call({app_env,AppName}, _From, #?STATE{ remote_node = _Node } = State) ->
+
+    %% TODO: find only the required app env from the proplist
+    {remote_all_env, AllAppEnv}
+        = lists:keyfind(remote_all_env, 1, State#?STATE.remote_state),
+    {AppName, AppEnv}
+        = lists:keyfind(AppName, 1, AllAppEnv),
+    {reply,AppEnv,State};
+
+
+    %% TODO: also build a all app env....
+
+handle_call(remote_which_applications, _From, State) ->
+   {reply, lists:keyfind(remote_running_applications, 1, State#?STATE.remote_state),State};
+handle_call(runtime_modules, _From, State) ->
+    {reply, lists:keyfind(remote_modules, 1, State#?STATE.remote_state),State};
+handle_call({trace, M, F, A, G, R}, _From, #?STATE{ remote_node = Node } = State) ->
+    % ok = rpc:call(Node, crell_remote, trace, [M, F, A]),
+    Trc = redbug_trace_pattern(M, F, A, G, R),
+    Opts = [{target, Node}],
+    {reply,
+        case redbug:start(Trc,Opts) of
+            redbug_already_started ->
+                redbug_already_started;
+            {oops, {C, R}} ->
+                {oops, {C, R}};
+            {Procs, Funcs} ->
+                {Procs, Funcs}
+        end,
+    State};
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call, ?MODULE}, State}.
 
@@ -120,6 +175,13 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+
+
+
+
+
 
 -spec inject_module(ModName :: term(), NodeName :: atom()) ->
                                         ok | {error, Reason :: term()}.
@@ -147,7 +209,7 @@ inject_module(ModName, NodeName) ->
                         [ModName]),
             {error, {get_object_code_failed, ModName}}
     end.
-    
+
   purge_module(Node, Module) ->
     Res = try rpc:call(Node, code, soft_purge, [Module]) of
               true ->
@@ -186,10 +248,10 @@ hard_purge_module(Node, Module) ->
 make_xref() ->
     ok.
 
-module_functions(Mod) ->
-    Exports = Mod:module_info(exports),
-    Unexported = [F || F <- Mod:module_info(functions), not lists:member(F, Exports)],
-    {Mod, Exports, Unexported}.
+% module_functions(Mod) ->
+%     Exports = Mod:module_info(exports),
+%     Unexported = [F || F <- Mod:module_info(functions), not lists:member(F, Exports)],
+%     {Mod, Exports, Unexported}.
 
 module_source(Module) ->
   get_source(Module).
@@ -199,16 +261,16 @@ abstract_code(Module) ->
         File = code:which(Module),
         {ok,{_Mod,[{abstract_code,{_Version,Forms}}]}} = beam_lib:chunks(File, [abstract_code]),
         Forms.
- 
+
 mod_src(Module) ->
     Forms = abstract_code(Module),
     lists:flatten([[erl_pp:form(F),$\n] || F <- Forms, element(1,F) =:= attribute orelse element(1,F) =:= function]).
- 
+
 fun_src(Mod, Fun, Arity) ->
     Forms = abstract_code(Mod),
     [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
     lists:flatten(erl_pp:form(FF)).
- 
+
 -spec get_source(module() | {module(), function(), Arity :: non_neg_integer()}) -> {ok, string()} | {error, Reason :: any()}.
 get_source(What) ->
         try
@@ -221,3 +283,100 @@ get_source(What) ->
         catch _:E ->
                 {error, E}
         end.
+
+
+% create_fd() ->
+%     spawn(?MODULE, listen_accept, []).
+
+% % connect_fd() ->
+% %     ok.
+
+% listen_accept() ->
+%     {ok, ListenSocket} =
+%         gen_tcp:listen(
+%             8765,
+%             [binary, {packet, raw}, {active, false}, {reuseaddr, true}]
+%         ),
+%         {ok, Socket} = gen_tcp:accept(ListenSocket),
+%         {ok,ConnCtrlPID} = crell_tcp_controller:start_link(Socket),
+%         gen_tcp:controlling_process(Socket, ConnCtrlPID).
+
+% format_handler(A, B, C, D) ->
+%     io:format("~p\n", [A]),
+%     io:format("~p\n", [B]),
+%     io:format("~p\n", [C]),
+%     io:format("~p\n", [D]),
+%     ok.
+
+% ets:new(ttb_history_table,[ordered_set,named_table,public]).
+% ttb:start_trace([node()],
+% [{crell_remote, module_info, []}],
+% {all, call},
+% [
+%     shell,
+%     {handler,{fun crell_server:format_handler/4, _InitState=[]}}
+% ]).
+
+% M all_functions, all_arities
+% M F              all_arities
+% M F A
+
+
+
+% "mod"
+redbug_trace_pattern(M, all_functions, all_arities, G, R) ->
+    atom_to_list(M)
+    ++ " -> " ++ return_stack_trace_patter(R);
+
+% "mod:fun"
+redbug_trace_pattern(M, F, all_arities, G, R) ->
+    atom_to_list(M) ++ ":"
+    ++ atom_to_list(F)
+    ++ " -> " ++ return_stack_trace_patter(R);
+
+% "mod:fun/3"
+redbug_trace_pattern(M, F, A, G, R) when is_integer(A) ->
+    atom_to_list(M) ++ ":"
+    ++ atom_to_list(F) ++ "/"
+    ++ integer_to_list(A)
+    ++ " -> " ++ return_stack_trace_patter(R);
+
+% "mod:fun('_',atom,X)"
+redbug_trace_pattern(M, F, A, G, R) when is_list(A) ->
+    atom_to_list(M) ++ ":"
+    ++ atom_to_list(F)
+    ++ arglist_to_trace_pattern(A, G)
+    ++ " -> " ++ return_stack_trace_patter(R).
+
+
+return_stack_trace_patter(return) ->
+    "return";
+return_stack_trace_patter(stack) ->
+    "stack";
+return_stack_trace_patter(return_stack) ->
+    return_stack_trace_patter(return)
+    ++ ";"
+    ++ return_stack_trace_patter(stack).
+
+arglist_to_trace_pattern(Args, Guard) ->
+    arglist_to_trace_pattern(Args, Guard, []).
+
+%% TODO: improve the string handling, why do we need flattening...
+arglist_to_trace_pattern([], "", R) ->
+    lists:flatten("(" ++ lists:reverse(R) ++ ") ");
+arglist_to_trace_pattern([], Guard, R) ->
+    A = lists:flatten("(" ++ lists:reverse(R) ++ ") when " ++ Guard ++ " "),
+    io:format("~p\n", [A]),
+    A;
+arglist_to_trace_pattern([Arg|RestArgs=[]], Guard, R) when is_list(Arg) ->
+    arglist_to_trace_pattern(RestArgs, Guard, [io_lib:format("~s", [Arg])|R]);
+arglist_to_trace_pattern([Arg|RestArgs=[]], Guard, R) ->
+    arglist_to_trace_pattern(RestArgs, Guard, [io_lib:format("~p", [Arg])|R]);
+arglist_to_trace_pattern([Arg|RestArgs], Guard, R) when is_list(Arg) ->
+    arglist_to_trace_pattern(RestArgs, Guard, [io_lib:format("~s,", [Arg])|R]);
+arglist_to_trace_pattern([Arg|RestArgs], Guard, R) ->
+    arglist_to_trace_pattern(RestArgs, Guard, [io_lib:format("~p,", [Arg])|R]).
+
+
+% Case starts with upper case, and an item in
+% char_to_string(X) ->

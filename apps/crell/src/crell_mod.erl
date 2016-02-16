@@ -1,3 +1,11 @@
+%% TODO: Why is this module not called crell_mods?
+%% Find some standard way of splitting the REST cowyboy mods
+
+%% TODO: Cache this JSON response, and use that properly......
+%% so that the page loads are quicker
+
+%% TODO: make an option to exclude OTP related modules...
+
 -module(crell_mod).
 
 -export([ init/2,
@@ -18,8 +26,8 @@ content_types_provided(Req, State) ->
     {[{<<"application/json">>, handle_json}], Req, State}.
 
 handle_json(Req, State) ->
-    ModList = crell_server:runtime_modules(),
-    Json = to_json(ModList, []),
+    {remote_modules,MFs} = crell_server:runtime_modules(),
+    Json = to_json(MFs, []),
     {Json,Req,State}.
 
 terminate(normal, _Req, _State) ->
@@ -31,10 +39,16 @@ terminate(Reason, _Req, _State) ->
 
 to_json([],R) ->
     jsx:encode ( R );
-to_json([{ModName,_ModPath}|T],R) ->
+to_json([{ModName,Exports}|T],R) ->
     to_json(T,[
         [
-            {<<"module_name">>, list_to_binary(atom_to_list(ModName))}
+            {<<"m">>,list_to_binary(atom_to_list(ModName))},
+            {<<"fs">>,
+                [
+                 [{<<"f">>, list_to_binary(atom_to_list(FunctionName))},
+                  {<<"a">>, Arity}]
+                || {FunctionName, Arity} <- Exports ]
+            }
             %% Some are preloaded... {erl_prim_loader,preloaded}
             %% {<<"module_path">>, list_to_binary(ModPath)}
         ] | R]
