@@ -39,6 +39,8 @@ routes() ->
                 []},
             {"/crell_mod/trace/:module",            crell_mod_trace,
                 []},
+            {"/crell_traces",                       crell_traces,
+                []},
             {"/[...]",                              cowboy_static,
                 {priv_dir, crell, "/www"}}
         ]
@@ -48,6 +50,11 @@ routes() ->
 port() ->
     Port = 9876,
     {ok,application:get_env(crell,http_port, Port)}.
+
+
+
+
+%% TODO:! how do i propery stop COWBOY !!!!!!!
 
 stop(Pid) ->
     cowboy:stop_listener(Pid).

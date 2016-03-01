@@ -13,16 +13,14 @@
     });
 
     $scope.trace_module = function(module){
-        // alert(module);
-        alert(window.location.origin + module);
-
-        // var response = $http.get(window.location.origin + id);
-        // response.success(function(data, status, headers, config) {
-
-        // });
-        // response.error(function(data, status, headers, config) {
-        //    alert("rest call failed!");
-        // });
+        var response = $http.get("/crell_mod/trace/" + module);
+        response.success(function(data, status, headers, config) {
+            // here, do something with data..........
+            // show the trace screen.......
+        });
+        response.error(function(data, status, headers, config) {
+           alert("rest call failed!");
+        });
     }
 
   });

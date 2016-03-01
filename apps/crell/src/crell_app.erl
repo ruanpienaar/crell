@@ -10,13 +10,18 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
+    crell_web = ets:new(crell_web, [ordered_set, named_table]),
     case crell_sup:start_link() of
         {ok,S} ->
-            {ok,_} = crell_web:start(),
+            {ok, CowboyListener} = crell_web:start(),
+            true = ets:insert(crell_web, {CowboyListener}),
             {ok,S};
         E ->
             E
     end.
 
 stop(_State) ->
+    CowboyListener = ets:first(crell_web),
+    crell_web:stop(CowboyListener),
+    true = ets:delete(crell_web),
     ok.

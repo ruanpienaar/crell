@@ -13,8 +13,9 @@
     module_source/1,
     trace/1,
     % trace/2,
-    trace/5,
-    redbug_trace_pattern/5
+    % trace/5,
+    redbug_trace_pattern/5,
+    get_traces/0
 ]).
 % -export([
 %     create_fd/0,
@@ -31,7 +32,9 @@
                   remote_node,
                   remote_node_cookie,
                   %% TODO: create type for remote state
-                  remote_state = []
+                  remote_state = [],
+                  traces = [],
+                  trace_pid
                 }).
 
 start_link() ->
@@ -59,12 +62,12 @@ runtime_modules() ->
     gen_server:call(?MODULE, runtime_modules).
 
 trace(M) when is_atom(M) ->
-    trace(M, all_functions, all_arities, "", return_stack).
+    trace(M, all_functions, all_arities, "", return_stack, []).
 
 % trace(M, F) when is_atom(M), is_atom(F) ->
 %     trace(M, F, all_arities, return_stack).
 
-trace(M, F, A, G, R)
+trace(M, F, A, G, R, Opts)
 %% when is_list(M) and is_list(F)
                             % and ( is_integer(A) or is_list(A) )
                           %% and is_list(G)
@@ -73,11 +76,15 @@ trace(M, F, A, G, R)
                           %   (R == stack) or
                           %   (R == return_stack) )
                           ->
-    gen_server:call(?MODULE, {trace, M, F, A, G, R}).
+    gen_server:call(?MODULE, {redbug_trace, M, F, A, G, R, Opts}).
+
+get_traces() ->
+    gen_server:call(?MODULE, {get_traces}).
 
 %% ---------------------------------------
 
 init({}) ->
+    process_flag(trap_exit, true),
     {ok,Node} = application:get_env(crell, remote_node),
     {ok,Cookie} = application:get_env(crell, remote_cookie),
     {_, _} = est_rem_conn(Node, Cookie).
@@ -147,11 +154,15 @@ handle_call(remote_which_applications, _From, State) ->
    {reply, lists:keyfind(remote_running_applications, 1, State#?STATE.remote_state),State};
 handle_call(runtime_modules, _From, State) ->
     {reply, lists:keyfind(remote_modules, 1, State#?STATE.remote_state),State};
-handle_call({trace, M, F, A, G, R}, _From, #?STATE{ remote_node = Node } = State) ->
-    % ok = rpc:call(Node, crell_remote, trace, [M, F, A]),
+handle_call({redbug_trace, M, F, A, G, R, Opts1}, _From, #?STATE{ remote_node = Node } = State) ->
     Trc = redbug_trace_pattern(M, F, A, G, R),
-    Opts = [{target, Node}],
-    {reply,
+    Opts = [{target, Node},
+            {print_fun, fun(T) -> gen_server:cast(?MODULE, {handle_trace, T}) end},
+            {time, 50000},
+            {msgs, 10000},
+            {blocking, true}
+          ] ++ Opts1,
+    Pid = spawn_link(fun() ->
         case redbug:start(Trc,Opts) of
             redbug_already_started ->
                 redbug_already_started;
@@ -159,15 +170,27 @@ handle_call({trace, M, F, A, G, R}, _From, #?STATE{ remote_node = Node } = State
                 {oops, {C, R}};
             {Procs, Funcs} ->
                 {Procs, Funcs}
-        end,
-    State};
-handle_call(_Request, _From, State) ->
-    {reply, {error, unknown_call, ?MODULE}, State}.
+        end
+    end),
+    {reply, {ok, Pid}, State#?STATE{ trace_pid = Pid }};
+handle_call({get_traces}, _From, State) ->
+    {reply, {ok, {whereis(redbug), State#?STATE.traces}}, State#?STATE{ traces = []}};
+handle_call(Request, _From, State) ->
+    {reply, {error, unknown_call, ?MODULE, Request}, State}.
 
+handle_cast({handle_trace, T}, State) ->
+    {noreply, State#?STATE{ traces = [T|State#?STATE.traces] }};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(_Info, State) ->
+handle_info({'EXIT', Pid, Reason}, State) when Pid == State#?STATE.trace_pid ->
+    io:format("trace handle_info ~p\n\n", [{'EXIT', Pid, Reason}]),
+    {noreply, State#?STATE{ trace_pid = undefined }};
+handle_info({'EXIT', Pid, Reason}, State) when Pid == State#?STATE.trace_pid ->
+    io:format("handle_info ~p\n\n", [{'EXIT', Pid, Reason}]),
+    {noreply, State};
+handle_info(Info, State) ->
+    io:format("handle_info ~p\n\n", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -324,18 +347,18 @@ get_source(What) ->
 
 
 % "mod"
-redbug_trace_pattern(M, all_functions, all_arities, G, R) ->
+redbug_trace_pattern(M, all_functions, all_arities, _G, R) ->
     atom_to_list(M)
     ++ " -> " ++ return_stack_trace_patter(R);
 
 % "mod:fun"
-redbug_trace_pattern(M, F, all_arities, G, R) ->
+redbug_trace_pattern(M, F, all_arities, _G, R) ->
     atom_to_list(M) ++ ":"
     ++ atom_to_list(F)
     ++ " -> " ++ return_stack_trace_patter(R);
 
 % "mod:fun/3"
-redbug_trace_pattern(M, F, A, G, R) when is_integer(A) ->
+redbug_trace_pattern(M, F, A, _G, R) when is_integer(A) ->
     atom_to_list(M) ++ ":"
     ++ atom_to_list(F) ++ "/"
     ++ integer_to_list(A)
