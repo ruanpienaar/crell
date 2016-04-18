@@ -30,19 +30,13 @@ terminate(_Reason, _Req, _State) ->
     ok.
 
 to_json(App, Data) ->
-    % make sure that each k,v is valid.
-    % k being atom, and v being [ ... ]
     ParsableData = parsable(Data),
-    io:format("ParsableData : ~p\n",[ParsableData]),
     jsx:encode(ParsableData).
 
 parsable({K, V}) ->
     parsable([{K, V}]);
 parsable(Data) when is_list(Data) ->
     try
-        % lists:reverse(
-        %     lists:foldl(fun parsable_key_value/2, [], Data)
-        % )
         list_to_binary(lists:flatten(io_lib:format("~p",[Data])))
     catch
         throw:{error, unsupported_format} ->

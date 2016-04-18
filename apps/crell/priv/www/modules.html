@@ -53,18 +53,20 @@
                 <tbody>
                     <tr ng-repeat="mod in mods">
                         <th>
-                            <input type="checkbox"
-                                   ng-click='trace_module(mod.m)'></input>
-                            {{mod.m}}
+                            <input type="checkbox" ng-click='trace_module(mod.m)' />{{mod.m}}
                         </th>
                         <td>
                             <span class="caret"></span>
-                            <ul class="hidden">
+
+                            <!-- TODO; get module functions from crell_server,
+                            when caret clicked -->
+
+                            <!-- <ul class="hidden">
                                <li ng-repeat="function in mod.fs">
                                    {{function.f}} / {{function.a}}
                                    <input type="checkbox"></input>
                                </li>
-                            </ul>
+                            </ul> -->
                         </td>
                     </tr>
                 </tbody>

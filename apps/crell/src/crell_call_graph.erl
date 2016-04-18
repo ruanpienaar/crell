@@ -40,40 +40,44 @@ edge_to_graph({From, To}) ->
 
 next_edge_to_graph(Module, Func, Arity) ->
     {ok,AllModEdges} = add_ebin_and_edges(Module),
-    [_,NextModEdges] =
-        lists:foldl(fun 
-                        %% exclude calls, that call themselves, like list loops
-                        (Edge={{M, F, A}, {M, F, A}}, 
-                                [[{M, F, A}, _PreviousEdge], Acc]) ->
-                            io:format("L) Edge ~p\n", [Edge]), 
-                            [[{M, F, A}, Edge], Acc];
-                        %% Exclude calls that have circular calls ( infinite loops )
-                        (Edge={{M, F, A}, {M2, F2, A2}}, 
-                                [[{M, F, A}, {{M, F, A}, {M2, F2, A2}}], Acc]) ->
-                            io:format("C) Edge ~p\n", [Edge]), 
-                            [[{M, F, A}, Edge], Acc];
-                        %% Exclude calls that have circular calls ( infinite loops )
-                        (Edge={{M, F, A}, {M2, F2, A2}}, 
-                                [[{M, F, A}, {{M2, F2, A2}, {M, F, A}}], Acc]) ->
-                            io:format("C) Edge ~p\n", [Edge]), 
-                            [[{M, F, A}, Edge], Acc];
-                        %% Using the edge, we're interested in.
-                        (Edge={{M, F, A}, {_,_,_}}, 
-                                [[{M, F, A}, _PreviousEdge], Acc]) ->
-                            io:format("Y) Edge ~p\n", [Edge]),
-                            [[{M, F, A}, Edge], [Edge|Acc]];
-                        %% Ignoring non-interesting edge
-                        (Edge, 
-                                [[{M, F, A}, _PreviousEdge], Acc]) ->
-                            % io:format("N) Edge ~p\n", [Edge]),
-                            [[{M, F, A}, Edge], Acc]
-        end, [[{Module,Func,Arity}, undefined],[]], AllModEdges),
-    lists:map(fun(Edge) -> 
-        edge_to_graph(Edge)
-    end, lists:reverse(NextModEdges)).
+
+    %% TODO: Fix infinate loops :D
+
+    % [_,NextModEdges] =
+    %     lists:foldl(fun
+    %                     %% exclude calls, that call themselves, like list loops
+    %                     (Edge={{M, F, A}, {M, F, A}},
+    %                             [[{M, F, A}, _PreviousEdge], Acc]) ->
+    %                         io:format("L) Edge ~p\n", [Edge]),
+    %                         [[{M, F, A}, Edge], Acc];
+    %                     %% Exclude calls that have circular calls ( infinite loops )
+    %                     (Edge={{M, F, A}, {M2, F2, A2}},
+    %                             [[{M, F, A}, {{M, F, A}, {M2, F2, A2}}], Acc]) ->
+    %                         io:format("C) Edge ~p\n", [Edge]),
+    %                         [[{M, F, A}, Edge], Acc];
+    %                     %% Exclude calls that have circular calls ( infinite loops )
+    %                     (Edge={{M, F, A}, {M2, F2, A2}},
+    %                             [[{M, F, A}, {{M2, F2, A2}, {M, F, A}}], Acc]) ->
+    %                         io:format("C) Edge ~p\n", [Edge]),
+    %                         [[{M, F, A}, Edge], Acc];
+    %                     %% Using the edge, we're interested in.
+    %                     (Edge={{M, F, A}, {_,_,_}},
+    %                             [[{M, F, A}, _PreviousEdge], Acc]) ->
+    %                         io:format("Y) Edge ~p\n", [Edge]),
+    %                         [[{M, F, A}, Edge], [Edge|Acc]];
+    %                     %% Ignoring non-interesting edge
+    %                     (Edge,
+    %                             [[{M, F, A}, _PreviousEdge], Acc]) ->
+    %                         % io:format("N) Edge ~p\n", [Edge]),
+    %                         [[{M, F, A}, Edge], Acc]
+    %     end, [[{Module,Func,Arity}, undefined],[]], AllModEdges),
+    % lists:map(fun(Edge) ->
+    %     edge_to_graph(Edge)
+    % end, lists:reverse(NextModEdges)).
+    AllModEdges.
 
 add_ebin_and_edges('$M_EXPR') ->
-    %% Still have to implement Unresolved calls, 
+    %% Still have to implement Unresolved calls,
     %% maybe actually read the source code, and try to see what the values we're.........
     {ok,[]};
 add_ebin_and_edges(Module) ->
@@ -105,11 +109,16 @@ stop_xref(Ref) ->
 
 add_ebin(EbinPath) ->
     try
-        {ok,_Modules} = xref:add_directory(?XSRV, EbinPath, ?OPTS)
+        case xref:add_directory(?XSRV, EbinPath, ?OPTS) of
+            {ok,_Modules} ->
+                ok;
+            {error, xref_base, Reason} ->
+                lager:error("~p got ~p",[?MODULE, {error, xref_base, Reason}])
+        end
     catch
         C:E ->
             ST = erlang:get_stacktrace(),
-            lager:error("~p got ~p, ~p\n~p\n",[C,E,ST])
+            lager:error("~p got ~p, ~p\n~p\n",[?MODULE, C, E, ST])
     end.
 
 module_edges(XServ, Module) ->
@@ -119,7 +128,7 @@ module_edges(XServ, Module) ->
     catch
         C:E ->
             ST = erlang:get_stacktrace(),
-            lager:error("~p got ~p, ~p\n~p\n",[C,E,ST]),
+            lager:error("~p got ~p, ~p\n~p\n",[?MODULE,C,E,ST]),
             {error,[{c,C},{e,E},{stacktrace,ST}]}
     end.
 

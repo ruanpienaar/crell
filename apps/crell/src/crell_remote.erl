@@ -19,8 +19,12 @@
 
 %% Tracing:
 -export([
-    trace/3
+    trace/3,
+    setup_traceing/2
 ]).
+
+-export([test_function/0]).
+-export([another_function/0]).
 
 %%----------------------------------------------------------------------
 
@@ -404,15 +408,64 @@ format(X) ->
 %%**********************************************************************
 %%----------------------------------------------------------------------
 
+reg_name(_Host, _Port) ->
+    list_to_atom( atom_to_list(?MODULE) ++ "_tracer" ).
 
-trace(M, F, _A) ->
+setup_traceing(Host, Port) ->
+    try
+        erlang:exit(reg_name(Host, Port), kill)
+    catch
+        _C:_E ->
+            ok
+    end,
+    {ok, Socket} = gen_tcp:connect(Host, Port, []),
+    true = erlang:register(
+            reg_name(Host, Port),
+            spawn(fun() -> trace_forwarding(Socket) end)
+    ),
+    ok.
 
-    %% TODO: i',m not going to build yet another tracing tool!!!
+trace_forwarding(Socket) ->
+    receive
+        A ->
+            io:format("A:~p\n", [A]),
+            ok = gen_tcp:send(Socket, term_to_binary(A)),
+            trace_forwarding(Socket)
+    end.
 
-    % dbg:tracer().
-    % dbg:p(all, call).
-    % dbg:tpl(M, F, [ {'_',[],[ {message, {return_trace}} ]} ]).
+trace(M, F, A) when is_integer(A) ->
+    try
+        erlang:exit(whereis(dbg), kill)
+    catch
+        _C:_E ->
+            ok
+    end,
+    {ok, _DbgPid} = dbg:start(),
+    dbg:tpl(M, F, A, cx),
+    dbg:p(all, [c, timestamp]),
+    dbg:tp(code, x),
+    TraceFn =
+        fun (Trace, _) ->
+            reg_name(h,p) ! Trace
+        end,
+    {ok, _Pid} = dbg:tracer(process, {TraceFn, ok}),
+    ok.
 
-    %% TODO: Rather use Eper!!!!!!
+test_function() ->
+    test_function1(a).
 
+test_function1(_X) ->
+    test_function2(a, b).
+
+test_function2(_X, _Y) ->
+    ok.
+
+
+another_function() ->
+    another_function2().
+
+another_function2() ->
+    another_function3().
+
+another_function3() ->
     ok.

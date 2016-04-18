@@ -60,15 +60,14 @@
      <script type="text/javascript">
      	function draw(){
 	        var name = $('#otp_app').val();
-	        $.get( "/crell_crawl/app/env/"+name)
+	        $.get( "/crell_app_env/"+name)
 	            .done(function( data ){
-	              //$('#appenv').html('<pre><code class="html" >'+JSON.stringify(data, null, "\t")+'</code></pre>');
-                //$('#appenv').html('<pre><code class="html" >'+data+'</code></pre>');
-                $('#appenv').html('<pre><code class="html" >'+data.replace(/\n/, "\\n")+'</code></pre>');
+                $('#appenv').html(
+                    '<pre><code class="erlang" >'+data+'</code></pre>'
+                );
 	              $('pre code').each(function(i, block) {
                   hljs.configure({
-                    tabReplace: '    ', // 4 spaces
-                    useBR: 'true'
+                    tabReplace: '    '// 4 spaces
                   })
                   hljs.initHighlighting();
 	                hljs.highlightBlock(block);

@@ -1,14 +1,16 @@
 -module(crell_web).
 -export([start/0,
-         stop/1
+         stop/0
     ]).
+
+-define(COWBOY_REF, http).
 
 start() ->
     {ok,Port} = port(),
     io:format("......\nStarting cowboy on ~p\n......\n",[Port]),
     Routes    = routes(),
     Dispatch  = cowboy_router:compile(Routes),
-    {ok, Pid} = cowboy:start_http(http,
+    {ok, Pid} = cowboy:start_http(?COWBOY_REF,
                                 _ConnectionPoolSize=10,
                                 [{port, Port}],
                                 [{env, [{dispatch, Dispatch}]},
@@ -17,6 +19,7 @@ start() ->
                                  {timeout, 500}
                                 ]
                                ),
+    io:format("Pid : ~p\n", [Pid]),
     {ok,Pid}.
 
 routes() ->
@@ -33,7 +36,7 @@ routes() ->
                 []},
             {"/crell_crawl/dir/content/:file_name", crell_crawl_dir,
                 []},
-            {"/crell_crawl/app/env/:app_name",      crell_app_env,
+            {"/crell_app_env/:app_name",            crell_app_env,
                 []},
             {"/crell_mod/all",                      crell_mod,
                 []},
@@ -51,15 +54,10 @@ port() ->
     Port = 9876,
     {ok,application:get_env(crell,http_port, Port)}.
 
+stop() ->
+    cowboy:stop_listener(?COWBOY_REF).
 
-
-
-%% TODO:! how do i propery stop COWBOY !!!!!!!
-
-stop(Pid) ->
-    cowboy:stop_listener(Pid).
-
-
+%% APP SUP TREE
 % TODO: maybe just show interesting apps,
  % rp ( [ crell_server:calc_proc(pid(0,X,0)) || X <- lists:seq(1,32767) ] ).
 

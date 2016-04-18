@@ -11,17 +11,23 @@
 -export([
     runtime_modules/0,
     module_source/1,
-    trace/1,
-    % trace/2,
+    redbug_trace/0,
+    redbug_trace/1,
+    redbug_trace/2,
     % trace/5,
     redbug_trace_pattern/5,
-    get_traces/0
+    get_eb_traces/0,
+    clear_traces/0
 ]).
+-export([inject_module/2,
+         purge_module/2 ]).
+
 % -export([
 %     create_fd/0,
 %     listen_accept/0
 % ]).
 %-export([format_handler/4]).
+-export([ remote_trace/0 ]).
 
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -34,7 +40,9 @@
                   %% TODO: create type for remote state
                   remote_state = [],
                   traces = [],
-                  trace_pid
+                  trace_pid,
+                  remote_trace_socket,
+                  remote_trace_port
                 }).
 
 start_link() ->
@@ -61,25 +69,45 @@ remote_which_applications() ->
 runtime_modules() ->
     gen_server:call(?MODULE, runtime_modules).
 
-trace(M) when is_atom(M) ->
-    trace(M, all_functions, all_arities, "", return_stack, []).
+%% TODO: make a function that'll create the empty values...
 
-% trace(M, F) when is_atom(M), is_atom(F) ->
-%     trace(M, F, all_arities, return_stack).
+%% all_functions, all_arities
+redbug_trace() ->
+    {ok,_} =
+        redbug_trace([ {crell_remote, test_function, 0, "", return_stack},
+                       {crell_remote, another_function, 0, "", return_stack}
+              ]),
+    crell_remote:test_function(),
+    crell_remote:another_function(),
+    crell_remote:test_function(),
+    crell_remote:another_function(),
+    crell_remote:another_function().
 
-trace(M, F, A, G, R, Opts)
-%% when is_list(M) and is_list(F)
-                            % and ( is_integer(A) or is_list(A) )
-                          %% and is_list(G)
-                          % and
-                          % ( (R == return) or
-                          %   (R == stack) or
-                          %   (R == return_stack) )
-                          ->
+%% TODO: Add type [ {m, f, a, g, r, opts}, ... ].
+redbug_trace(Specs) when is_list(Specs) ->
+    redbug_trace(Specs, []);
+redbug_trace(M) when is_atom(M) ->
+    redbug_trace({M, all_functions, all_arities, "", return_stack, []});
+redbug_trace({M, F, A, G, R, Opts}) when
+        (is_list(M) and is_list(A) and is_list(G))
+        andalso
+        ((R == return) or (R == stack) or (R == return_stack)) ->
     gen_server:call(?MODULE, {redbug_trace, M, F, A, G, R, Opts}).
 
-get_traces() ->
-    gen_server:call(?MODULE, {get_traces}).
+redbug_trace(Specs, Opts) when is_list(Specs), is_list(Opts) ->
+    gen_server:call(?MODULE, {redbug_trace, Specs, Opts});
+redbug_trace(M, F) when is_atom(M), is_atom(F) ->
+    redbug_trace({M, F, all_arities, "", return_stack, []}).
+
+remote_trace() ->
+    gen_server:call(?MODULE,
+                    {rtrace, application, which_applications, 0}).
+
+get_eb_traces() ->
+    gen_server:call(?MODULE, {get_eb_traces}).
+
+clear_traces() ->
+    gen_server:call(?MODULE, {clear_traces}).
 
 %% ---------------------------------------
 
@@ -154,27 +182,31 @@ handle_call(remote_which_applications, _From, State) ->
    {reply, lists:keyfind(remote_running_applications, 1, State#?STATE.remote_state),State};
 handle_call(runtime_modules, _From, State) ->
     {reply, lists:keyfind(remote_modules, 1, State#?STATE.remote_state),State};
-handle_call({redbug_trace, M, F, A, G, R, Opts1}, _From, #?STATE{ remote_node = Node } = State) ->
-    Trc = redbug_trace_pattern(M, F, A, G, R),
-    Opts = [{target, Node},
-            {print_fun, fun(T) -> gen_server:cast(?MODULE, {handle_trace, T}) end},
-            {time, 50000},
-            {msgs, 10000},
-            {blocking, true}
-          ] ++ Opts1,
-    Pid = spawn_link(fun() ->
-        case redbug:start(Trc,Opts) of
-            redbug_already_started ->
-                redbug_already_started;
-            {oops, {C, R}} ->
-                {oops, {C, R}};
-            {Procs, Funcs} ->
-                {Procs, Funcs}
-        end
-    end),
+handle_call({redbug_trace, Specs, Opts1}, _From, #?STATE{ remote_node = Node } = State) ->
+    Trcs = [ redbug_trace_pattern(M, F, A, G, R) || {M,F,A,G,R} <- Specs ],
+    Pid = do_trace(Trcs, Opts1, Node),
     {reply, {ok, Pid}, State#?STATE{ trace_pid = Pid }};
-handle_call({get_traces}, _From, State) ->
-    {reply, {ok, {whereis(redbug), State#?STATE.traces}}, State#?STATE{ traces = []}};
+handle_call({redbug_trace, M, F, A, G, R, Opts1}, _From,
+            #?STATE{ remote_node = Node } = State) ->
+    Trc = redbug_trace_pattern(M, F, A, G, R),
+    Pid = do_trace(Trc, Opts1, Node),
+    {reply, {ok, Pid}, State#?STATE{ trace_pid = Pid }};
+handle_call({rtrace, M, F, A}, _From,
+            #?STATE{ remote_node = Node } = State) ->
+    Port = random_avail_port(),
+    Host = "localhost",
+    {ok, LSock} = gen_tcp:listen(Port, [binary]),
+    ok = rpc:call(Node, crell_remote, setup_traceing, [Host, Port]),
+    {ok, Socket} = gen_tcp:accept(LSock),
+    ok = inet:setopts(Socket, [{active, once}]),
+    ok = gen_tcp:controlling_process(Socket, self()),
+    ok = rpc:call(Node, crell_remote, trace, [M,F,A]),
+    {reply, ok, State#?STATE{ remote_trace_socket = Socket,
+                              remote_trace_port = Port }};
+handle_call({get_eb_traces}, _From, State) ->
+    {reply, {ok, {whereis(redbug),lists:reverse(State#?STATE.traces)}}, State};
+handle_call({clear_traces}, _From, State) ->
+    {reply, {ok, whereis(redbug)}, State#?STATE{ traces = []}};
 handle_call(Request, _From, State) ->
     {reply, {error, unknown_call, ?MODULE, Request}, State}.
 
@@ -183,6 +215,19 @@ handle_cast({handle_trace, T}, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({tcp, Socket, Data},
+        #?STATE{ remote_trace_socket = Socket } = State) ->
+    ok = inet:setopts(Socket,[{active, once}]),
+    do_handle_tcp(Data),
+    {noreply, State};
+handle_info({tcp_closed,_Socket},State) ->
+    reopen_connection(),
+    {noreply, State};
+handle_info({tcp_error, _Socket, _Reason},
+        #?STATE{ remote_trace_socket = Socket } = State) ->
+    ok = gen_tcp:close(Socket),
+    {noreply, State#?STATE{ remote_trace_socket = undefined,
+                            remote_trace_port = undefined}};
 handle_info({'EXIT', Pid, Reason}, State) when Pid == State#?STATE.trace_pid ->
     io:format("trace handle_info ~p\n\n", [{'EXIT', Pid, Reason}]),
     {noreply, State#?STATE{ trace_pid = undefined }};
@@ -199,12 +244,7 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
-
-
-
-
-
+%% --------------------------------------------------------------------------
 
 -spec inject_module(ModName :: term(), NodeName :: atom()) ->
                                         ok | {error, Reason :: term()}.
@@ -308,28 +348,28 @@ get_source(What) ->
         end.
 
 
-% create_fd() ->
-%     spawn(?MODULE, listen_accept, []).
+create_fd() ->
+    spawn(?MODULE, listen_accept, []).
 
-% % connect_fd() ->
-% %     ok.
-
-% listen_accept() ->
-%     {ok, ListenSocket} =
-%         gen_tcp:listen(
-%             8765,
-%             [binary, {packet, raw}, {active, false}, {reuseaddr, true}]
-%         ),
-%         {ok, Socket} = gen_tcp:accept(ListenSocket),
-%         {ok,ConnCtrlPID} = crell_tcp_controller:start_link(Socket),
-%         gen_tcp:controlling_process(Socket, ConnCtrlPID).
-
-% format_handler(A, B, C, D) ->
-%     io:format("~p\n", [A]),
-%     io:format("~p\n", [B]),
-%     io:format("~p\n", [C]),
-%     io:format("~p\n", [D]),
+% connect_fd() ->
 %     ok.
+
+listen_accept() ->
+    {ok, ListenSocket} =
+        gen_tcp:listen(
+            8765,
+            [binary, {packet, raw}, {active, false}, {reuseaddr, true}]
+        ),
+        {ok, Socket} = gen_tcp:accept(ListenSocket),
+        {ok,ConnCtrlPID} = crell_tcp_controller:start_link(Socket),
+        gen_tcp:controlling_process(Socket, ConnCtrlPID).
+
+format_handler(A, B, C, D) ->
+    io:format("~p\n", [A]),
+    io:format("~p\n", [B]),
+    io:format("~p\n", [C]),
+    io:format("~p\n", [D]),
+    ok.
 
 % ets:new(ttb_history_table,[ordered_set,named_table,public]).
 % ttb:start_trace([node()],
@@ -403,3 +443,31 @@ arglist_to_trace_pattern([Arg|RestArgs], Guard, R) ->
 
 % Case starts with upper case, and an item in
 % char_to_string(X) ->
+
+do_trace(Trc, Opts1, Node) ->
+    io:format("Trc : ~p\n", [Trc]),
+    Opts = [{target, Node},
+            {print_fun, fun(T) -> gen_server:cast(?MODULE, {handle_trace, T}) end},
+            {time, 50000},
+            {msgs, 10000},
+            {blocking, true}
+          ] ++ Opts1,
+    spawn_link(fun() ->
+        case redbug:start(Trc,Opts) of
+            redbug_already_started ->
+                redbug_already_started;
+            {oops, {C, R}} ->
+                {oops, {C, R}};
+            {Procs, Funcs} ->
+                {Procs, Funcs}
+        end
+    end).
+
+random_avail_port() ->
+    33333.
+
+do_handle_tcp(TcpData) ->
+    io:format("TcpData : ~p\n", [binary_to_term(TcpData)]).
+
+reopen_connection() ->
+    ok.
