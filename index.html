@@ -1,0 +1,56 @@
+<html lang="en-GB"><head>
+    <meta charset="utf-8">
+        <title>Processes</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js" type="text/javascript"></script>
+        <script src="http://code.jquery.com/ui/1.8.23/jquery-ui.min.js" type="text/javascript"></script>
+        <script src="http://jquery-ui.googlecode.com/svn/tags/latest/external/jquery.bgiframe-2.1.2.js" type="text/javascript"></script>
+        <script src="http://jquery-ui.googlecode.com/svn/tags/latest/ui/minified/i18n/jquery-ui-i18n.min.js" type="text/javascript"></script>
+        <script src="http://mbostock.github.com/d3/d3.v2.js?2.9.5"></script>
+        <link rel="stylesheet" href="http://code.jquery.com/ui/1.8.23/themes/base/jquery-ui.css" type="text/css" media="all">
+        <link href="http://languagenetwork.cotrino.com/langnet.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+
+    <script type="text/javascript" src="script.js"></script>
+    <script type="text/javascript" src="data.js"></script>
+
+<div id="toolbox">
+        <p id="titlep">
+            <!-- <div id="title">LanguageNetwork, 2012</div><br/> -->
+            <!-- <a class="boton" href="http://www.cotrino.com/" target="_blank">&copy; Cotrino.com</a> -->
+            <!-- <a class="boton" href="#" onClick="about();return false;">How it works</a> -->
+        </p>
+        <div id="chartSelector">
+            <input type="radio" value="network" id="networkOption" name="chartOption" checked="checked" /><label for="networkOption">network</label>
+            <input type="radio" value="chord" id="chordOption" name="chartOption" /><label for="chordOption">chord</label>
+        </div>
+        <p><input id="hide_checkbox" type="checkbox" onClick="hide()" />Hide non linked</p>
+        <!-- <div id="sliderContainer">
+            Filter by similarity level: <span id="similarity"></span>
+            <div id="slider"></div>
+        </div> -->
+        <p id="hint"></p>
+        <div id="process_information"></div>
+    </div>
+
+  <div id="graphHolder"></div>
+    <script type="text/javascript">
+        $(function() {
+             $("#about" ).dialog({
+                autoOpen: false,
+                show: "blind",
+                hide: "explode",
+                width: 800,
+                height: 600
+            });
+            $("#chartSelector").buttonset();
+            $("#chartSelector").change(function(event){
+                chartChange($("input[type=radio]:checked").val());
+            });
+            restart();
+            $("#slider").slider({ change: filterChange, min: similarityThresholdMin, max: similarityThresholdMax, value: similarityThreshold });
+        });
+    </script>
+</body></html>
