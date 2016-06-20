@@ -17,6 +17,7 @@
     % trace/5,
     redbug_trace_pattern/5,
     get_eb_traces/0,
+    get_traces/0,
     clear_traces/0
 ]).
 -export([inject_module/2,
@@ -87,11 +88,13 @@ redbug_trace() ->
 redbug_trace(Specs) when is_list(Specs) ->
     redbug_trace(Specs, []);
 redbug_trace(M) when is_atom(M) ->
-    redbug_trace({M, all_functions, all_arities, "", return_stack, []});
-redbug_trace({M, F, A, G, R, Opts}) when
-        (is_list(M) and is_list(A) and is_list(G))
-        andalso
-        ((R == return) or (R == stack) or (R == return_stack)) ->
+    redbug_trace({M, all_functions, all_arities, "", return, []});
+redbug_trace({M, F, A, G, R, Opts}) 
+        % when
+        % (is_atom(M) and is_atom(F) and (is_list(A) or all_arities) and is_list(G))
+        % andalso
+        % ((R == return) or (R == stack) or (R == return_stack)) 
+        ->
     gen_server:call(?MODULE, {redbug_trace, M, F, A, G, R, Opts}).
 
 redbug_trace(Specs, Opts) when is_list(Specs), is_list(Opts) ->
@@ -105,6 +108,9 @@ remote_trace() ->
 
 get_eb_traces() ->
     gen_server:call(?MODULE, {get_eb_traces}).
+
+get_traces() ->
+    gen_server:call(?MODULE, {get_traces}).
 
 clear_traces() ->
     gen_server:call(?MODULE, {clear_traces}).

@@ -53,7 +53,12 @@
                 <tbody>
                     <tr ng-repeat="mod in mods">
                         <th>
-                            <input type="checkbox" ng-click='trace_module(mod.m)' />{{mod.m}}
+                            <input type="checkbox"
+                            	   ng-model="string"
+                            	   ng-change="trace_module(mod.m)"
+                            	   ng-true-value="true"
+                            	   ng-false-value="false"
+                            />{{mod.m}}
                         </th>
                         <td>
                             <span class="caret"></span>

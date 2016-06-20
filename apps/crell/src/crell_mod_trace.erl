@@ -19,8 +19,9 @@ content_types_provided(Req, State) ->
     {[{<<"application/json">>, handle_json}], Req, State}.
 
 handle_json(Req, State) ->
-    Response = crell_server:trace(State#?STATE.module),
-    Json = to_json(Response),
+	M = sanitise_input({module, State#?STATE.module}),
+    {ok, Pid} = crell_server:redbug_trace(M),
+    Json = jsx:encode([{response, true}]),
     {Json,Req,State}.
 
 terminate(normal, _Req, _State) ->
@@ -32,3 +33,6 @@ terminate(Reason, _Req, _State) ->
 
 to_json(Response) ->
     jsx:encode( Response ).
+    
+sanitise_input({module, M}) ->
+	list_to_atom(binary_to_list(M)).

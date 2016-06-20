@@ -19,7 +19,7 @@ content_types_provided(Req, State) ->
 
 handle_json(Req, State) ->
     Json =
-        case crell_server:get_traces() of
+        case crell_server:get_eb_traces() of
             {ok,{undefined,[]}} ->
                 to_json([]);
             {ok,{undefined,Traces}} ->
@@ -91,9 +91,12 @@ to_json([H|T], R) ->
 
 %% TODO: probably use io_lib:format for all the below string operations...
 mfa_to_bin({M,F,A}) ->
-    list_to_binary(atom_to_list(M) ++ ":" ++
-                   atom_to_list(F) ++
-                   args_to_str(A)).
+    list_to_binary(
+        io_lib:format("~p:~p~p", [M, F, A])
+    ).
+    % list_to_binary(atom_to_list(M) ++ ":" ++
+    %                atom_to_list(F) ++
+    %                args_to_str(A)).
 
 args_to_str(A) when is_integer(A) ->
     "/"++integer_to_list(A);
