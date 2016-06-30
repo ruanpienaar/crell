@@ -17,10 +17,12 @@ run(Module) ->
     Filename = atom_to_list(Module)++".txt",
     io:format("Writing to : ~p\n",[Filename]),
     {ok,FPID} = file:open(Filename, [write, binary]),
-    Data = list_to_binary(io_lib:format("~p\n",[CallGraphBranches])),
-    ok = file:write(FPID,Data),
-    ok = file:close(FPID),
-    stop_xref(?XSRV).
+    %Data = list_to_binary(io_lib:format("~p\n",[CallGraphBranches])),
+    % Data = list_to_binary(CallGraphBranches),
+    % ok = file:write(FPID,Data),
+    % ok = file:close(FPID),
+    % stop_xref(?XSRV).
+    CallGraphBranches.
 
 edges_to_graph(L) when is_list(L) ->
     edges_to_graph(L, []).

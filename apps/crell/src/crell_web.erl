@@ -44,6 +44,10 @@ routes() ->
                 []},
             {"/crell_traces",                       crell_traces,
                 []},
+            {"/crell_call_graph/:module",           crell_call_graph_rest,
+                []},
+            {"/crell_process_info",                 crell_process_info,
+                []},
             {"/[...]",                              cowboy_static,
                 {priv_dir, crell, "/www"}}
         ]
