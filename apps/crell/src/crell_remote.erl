@@ -13,8 +13,13 @@
 %% Supervision diagram
 -export([
     start_appmon/0,
-    calc_app_tree/2,
-    calc_proc_tree/2
+    calc_app_tree/2
+]).
+
+%% Processes
+-export([
+    calc_proc_tree/2,
+    non_sys_processes/0
 ]).
 
 %% Tracing:
@@ -406,6 +411,44 @@ format(X) ->
 %%
 %%
 %%**********************************************************************
+%%----------------------------------------------------------------------
+
+
+
+non_sys_processes() ->
+    non_sys_processes(processes(), []).
+
+non_sys_processes([], R) ->
+    R;
+non_sys_processes([H|T], R) when H == self() ->
+    non_sys_processes(T, R);
+non_sys_processes([H|T], R) ->
+    case process_info(H, [registered_name,initial_call,message_queue_len]) of
+        undefined ->
+            non_sys_processes(T, R);
+        [{registered_name,Reg},{initial_call,Initial},{message_queue_len,Qlen}] ->
+            Name =
+                case Reg of
+                    [] -> initial_call(Initial, H);
+                    _  -> Reg
+                end,
+            case lists:member(Name, sys_processes()) of
+                true ->
+                    non_sys_processes(T, R);
+                false ->
+                    non_sys_processes(T, [ [{pid,H},{name,Name},{mq,Qlen}] |R])
+            end
+    end.
+
+initial_call({proc_lib, init_p, _}, Pid) ->
+    proc_lib:translate_initial_call(Pid);
+initial_call(Initial, _Pid) ->
+    Initial.
+
+sys_processes() ->
+    [auth, code_server, global_name_server, inet_db,
+     mnesia_recover, net_kernel, timer_server, wxe_master].
+
 %%----------------------------------------------------------------------
 
 reg_name(_Host, _Port) ->

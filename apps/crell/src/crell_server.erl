@@ -23,6 +23,8 @@
 -export([inject_module/2,
          purge_module/2 ]).
 
+-export([non_sys_processes/0]).
+
 % -export([
 %     create_fd/0,
 %     listen_accept/0
@@ -64,6 +66,9 @@ calc_proc(Pid,Opts) ->
 calc_app_env(AppName) ->
    gen_server:call(?MODULE, {app_env,AppName}).
 
+calc_pid(Pid) ->
+    gen_server:call(?MODULE, {pid, Pid}).
+
 remote_which_applications() ->
    gen_server:call(?MODULE, remote_which_applications).
 
@@ -89,11 +94,11 @@ redbug_trace(Specs) when is_list(Specs) ->
     redbug_trace(Specs, []);
 redbug_trace(M) when is_atom(M) ->
     redbug_trace({M, all_functions, all_arities, "", return, []});
-redbug_trace({M, F, A, G, R, Opts}) 
+redbug_trace({M, F, A, G, R, Opts})
         % when
         % (is_atom(M) and is_atom(F) and (is_list(A) or all_arities) and is_list(G))
         % andalso
-        % ((R == return) or (R == stack) or (R == return_stack)) 
+        % ((R == return) or (R == stack) or (R == return_stack))
         ->
     gen_server:call(?MODULE, {redbug_trace, M, F, A, G, R, Opts}).
 
@@ -114,6 +119,11 @@ get_traces() ->
 
 clear_traces() ->
     gen_server:call(?MODULE, {clear_traces}).
+
+%% ---------------------------------------
+
+non_sys_processes() ->
+    gen_server:call(?MODULE, {non_sys_processes}).
 
 %% ---------------------------------------
 
@@ -180,10 +190,10 @@ handle_call({app_env,AppName}, _From, #?STATE{ remote_node = _Node } = State) ->
     {AppName, AppEnv}
         = lists:keyfind(AppName, 1, AllAppEnv),
     {reply,AppEnv,State};
-
-
+handle_call({pid, Pid}, _From, #?STATE{ remote_node = Node } = State) ->
+    R = rpc:call(Node,crell_remote,calc_proc_tree,[Pid, []]),
+    {reply, R, State};
     %% TODO: also build a all app env....
-
 handle_call(remote_which_applications, _From, State) ->
    {reply, lists:keyfind(remote_running_applications, 1, State#?STATE.remote_state),State};
 handle_call(runtime_modules, _From, State) ->
@@ -213,13 +223,20 @@ handle_call({get_eb_traces}, _From, State) ->
     {reply, {ok, {whereis(redbug),lists:reverse(State#?STATE.traces)}}, State};
 handle_call({clear_traces}, _From, State) ->
     {reply, {ok, whereis(redbug)}, State#?STATE{ traces = []}};
+handle_call({non_sys_processes}, _From, #?STATE{ remote_node = Node } = State) ->
+    ProcList = rpc:call(Node, crell_remote, non_sys_processes, []),
+    {reply, {ok, ProcList}, State};
 handle_call(Request, _From, State) ->
     {reply, {error, unknown_call, ?MODULE, Request}, State}.
+
+%% --------------------------------------------------------------------------
 
 handle_cast({handle_trace, T}, State) ->
     {noreply, State#?STATE{ traces = [T|State#?STATE.traces] }};
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+%% --------------------------------------------------------------------------
 
 handle_info({tcp, Socket, Data},
         #?STATE{ remote_trace_socket = Socket } = State) ->
@@ -244,8 +261,12 @@ handle_info(Info, State) ->
     io:format("handle_info ~p\n\n", [Info]),
     {noreply, State}.
 
+%% --------------------------------------------------------------------------
+
 terminate(_Reason, _State) ->
     ok.
+
+%% --------------------------------------------------------------------------
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
