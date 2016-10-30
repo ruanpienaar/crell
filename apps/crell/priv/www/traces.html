@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html ng-app="CrellApp" >
+<html lang="en" ng-app="CrellApp">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -30,6 +30,7 @@
         <nav>
           <ul class="nav nav-justified">
             <li><a href="index.html">Home</a></li>
+            <li><a href="application.html">Applications</a></li>
             <li><a href="proc_tree.html">Sup Tree</a></li>
             <li><a href="sup_tree.html">Sup Tree</a></li>
             <li><a href="code_tree.html">Code Browser</a></li>
@@ -39,31 +40,51 @@
           </ul>
         </nav>
       </div>
-      <div>
-        <h2>Traces</h2>
-        <button onclick="get_traces();">GET</button>
+      <div class="jumbotron">
 
+        <table class="table table-bordered table-striped">
+            <caption>Trace active nodes</caption>
+            <tr>
+                <td>Node</td>
+                <td>Cookie</td>
+                <td>type</td>
+            </tr>
+            <tr ng-repeat='active_trace_node in active_trace_nodes'>
+                <td>
+                    {{active_trace_node.node}}
+                </td>
+                <td>
+                    {{active_trace_node.cookie}}
+                </td>
+                <td>
+                    {{active_trace_node.type}}
+                </td>
+            </tr>
+        </table>
 
-        <ol>
-            <li ng-repeat="trace in traces">
-                <!-- {{trace | prettyJSON}} -->
-                <ul>
-                    <li>{{trace.msg}}</li>
-                    <li>{{trace.mfa}}</li>
-                    <li><pre>{{trace.b}}</pre></li>
-                    <li>{{trace.p}}</li>
-                    <li>{{trace.p_inc}}</li>
-                    <li>{{trace.timestamp}}</li>
-                </ul>
+        <table class="table table-bordered table-striped">
+            <caption>Active Traces</caption>
+            <tr>
+                <td>Modole</td>
+                <td>Function</td>
+                <td>Arity</td>
+            </tr>
+            <tr ng-repeat='active_trace in active_traces'>
+                <td>
+                    {{active_trace.module}}
+                </td>
+                <td>
+                    {{active_trace.function}}
+                </td>
+                <td>
+                    {{active_trace.arity}}
+                </td>
+            </tr>
+        </table>
 
-            </li>
-        </ol>
-
-
-        <script type="text/javascript" src="js/jquery-1.11.2.min.js">
-        </script>
      </div>
    </div>
 
+    <script type="text/javascript" src="js/jquery-1.11.2.min.js"></script>
 </body>
 </html>

@@ -39,6 +39,11 @@ routes() ->
             {"/crell_traces", crell_traces, []},
             {"/crell_call_graph/:module", crell_call_graph_rest, []},
             {"/crell_process_info", crell_process_info, []},
+
+            %% Goanna integration:
+            {"/goanna_api/nodes", crell_goanna_api, []},
+            {"/goanna_api/list_active_traces", crell_goanna_api, []},
+
             {"/[...]", cowboy_static, {priv_dir, crell, "/www"}}
         ]
      }

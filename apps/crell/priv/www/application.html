@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="CrellApp">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="Ruan pienaar">
+    <link rel="icon" href="favicon.ico">
+    <title>Process Tree</title>
+
+    <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="justified-nav.css" rel="stylesheet">
+
+    <script type="text/javascript" src="angular-1.3.9/angular.min.js">
+    </script>
+    <script type="text/javascript" src="js/apps.js">
+    </script>
+  </head>
+
+  <body ng-controller="CrellController as ctrl">
+
+    <div class="container">
+      <!-- The justified navigation menu is meant for single line per list item.
+           Multiple lines will require custom code not provided by Bootstrap. -->
+      <div class="masthead">
+        <h3 class="text-muted">crell</h3>
+        <nav>
+          <ul class="nav nav-justified">
+            <li><a href="index.html">Home</a></li>
+            <li class="active"><a href="application.html">Applications</a></li>
+            <li><a href="proc_tree.html">Proc Tree</a></li>
+            <li><a href="sup_tree.html">Sup Tree</a></li>
+            <li><a href="code_tree.html">Code Browser</a></li>
+            <li><a href="app_env.html">App Env</a></li>
+            <li><a href="modules.html">modules</a></li>
+            <li><a href="traces.html">Traces</a></li>
+          </ul>
+        </nav>
+      </div>
+
+    <div class="jumbotron">
+        <h2>Applications</h2>
+        <!-- <form>
+            <select id="otp_app" onchange="draw()">
+                <option ng-repeat="app in app_data" value="{{app.application_name}}">
+                {{app.application_name}}
+                </option>
+            </select>
+        </form> -->
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Erts Version</th>
+                        <th>Application Version</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr ng-repeat="app in app_data">
+                        <td>{{app.application_name}}</td>
+                        <td>{{app.erts_version}}</td>
+                        <td>{{app.application_version}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+     </div>
+
+    <!-- Site footer -->
+      <footer class="footer">
+        <p>&copy; Ruan Pienaar 2016</p>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="js/jquery-1.11.2.min.js"></script>
+  </body>
+</html>
