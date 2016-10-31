@@ -38,18 +38,18 @@ handle_json(Req, State) ->
 handle_json_path(Req, State, <<"/goanna_api/nodes">>) ->
     Nodes = goanna_api:nodes(),
     {jsx:encode(
-        [ [{<<"node">>, ensure_bin(Node)},
-           {<<"cookie">>, ensure_bin(Cookie)},
-           {<<"type">>, ensure_bin(Type)}] || {Node,Cookie,Type} <- Nodes ]
+        [ [{<<"node">>, crell_web_utils:ens_bin(Node)},
+           {<<"cookie">>, crell_web_utils:ens_bin(Cookie)},
+           {<<"type">>, crell_web_utils:ens_bin(Type)}] || {Node,Cookie,Type} <- Nodes ]
     ),Req,State};
 handle_json_path(Req, State, <<"/goanna_api/list_active_traces">>) ->
     ActiveTraces = goanna_api:list_active_traces(),
     {jsx:encode(
-        [ [{<<"node">>, ensure_bin(Node)},
-           {<<"started">>, ensure_bin(localtime_ms_str(Now))},
-           {<<"module">>, ensure_bin(TrcPattern#trc_pattern.m)},
-           {<<"function">>, ensure_bin(undef_function(TrcPattern#trc_pattern.f))},
-           {<<"arity">>, ensure_bin(undef_arity(TrcPattern#trc_pattern.a))},
+        [ [{<<"node">>, crell_web_utils:ens_bin(Node)},
+           {<<"started">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
+           {<<"module">>, crell_web_utils:ens_bin(TrcPattern#trc_pattern.m)},
+           {<<"function">>, crell_web_utils:ens_bin(undef_function(TrcPattern#trc_pattern.f))},
+           {<<"arity">>, crell_web_utils:ens_bin(undef_arity(TrcPattern#trc_pattern.a))},
            {<<"trace_opts">>, proplist_to_json_ready(TrcOpts)}
           ] || {{Node,TrcPattern},Now,TrcOpts} <- ActiveTraces ]
     ),Req,State}.
@@ -61,35 +61,15 @@ terminate({crash, _Class, _Reason}, _Req, _State) ->
 terminate(_Reason, _Req, _State) ->
     ok.
 
-ensure_bin(V) when is_pid(V) ->
-    list_to_binary(pid_to_list(V));
-ensure_bin(V) when is_atom(V) ->
-    list_to_binary(atom_to_list(V));
-ensure_bin(V) when is_list(V) ->
-    list_to_binary(V);
-ensure_bin(V) when is_binary(V) ->
-    V;
-ensure_bin(V) when is_integer(V) ->
-    list_to_binary(integer_to_list(V)).
-
 undef_function(undefined) ->
     "*";
 undef_function(F) ->
     F.
 
 undef_arity(undefined) ->
-    "/*";
+    "*";
 undef_arity(A) ->
     A.
-
-localtime_ms_str(Now) ->
-    {{Yy,Mm,Dd}, {Hours, Minutes, Seconds, MicroS}} = localtime_ms(Now),
-    io_lib:format("~p-~p-~p ~p:~p:~p.~p", [Yy,Mm,Dd,Hours,Minutes,Seconds,MicroS]).
-
-localtime_ms(Now) ->
-    {_, _, Micro} = Now,
-    {Date, {Hours, Minutes, Seconds}} = calendar:now_to_local_time(Now),
-    {Date, {Hours, Minutes, Seconds, Micro div 1000 rem 1000}}.
 
 proplist_to_json_ready(Props) ->
     lists:map(fun(KVPair) ->

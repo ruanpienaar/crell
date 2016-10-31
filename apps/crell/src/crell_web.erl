@@ -41,6 +41,7 @@ routes() ->
             {"/crell_process_info", crell_process_info, []},
 
             %% Goanna integration:
+            {"/goanna_api/ws", crell_goanna_api_ws, []},
             {"/goanna_api/nodes", crell_goanna_api, []},
             {"/goanna_api/list_active_traces", crell_goanna_api, []},
 
