@@ -124,8 +124,22 @@
             <button id="clearBtn">Clear</button>
             <button id="printBtn">Print</button>
         </div>
-        <div id="traces">
-            <div class="row">Traces</div>
+
+        <div>
+            <table class="table table-bordered table-striped">
+            <caption>Traces</caption>
+            <thead>
+                <tr>
+                    <th>Datetime</th>
+                    <!-- <th>Type</th> -->
+                    <th>Pid</th>
+                    <th>Label</th>
+                    <th>Info</th>
+                    <th>Extra</th>
+                </tr>
+            </thead>
+            <tbody id="traces_table"></tbody>
+        </table>
         </div>
 
      </div>
@@ -193,6 +207,13 @@
 
             socket.onmessage = function(msg){
                 message(msg);
+
+                var json_data = JSON.parse(msg.data);
+                for(var i = 0; i < json_data.length; i++) {
+                    var obj = json_data[i];
+                    process_objs(obj);
+                }
+
             }
 
             socket.onclose = function(){

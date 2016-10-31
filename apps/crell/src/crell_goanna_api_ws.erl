@@ -7,7 +7,31 @@
 init(Req, Opts) ->
     erlang:register(crell_goanna_api_ws, self()),
     process_flag(trap_exit, true),
-    io:format("~p~n~p~n", [self(),erlang:process_info(self())]),
+    % io:format("~p~n~p~n", [self(),erlang:process_info(self())]),
+    % OUTPUT:
+    %     <0.1640.0>
+    % [{registered_name,crell_goanna_api_ws},
+    %  {current_function,{crell_goanna_api_ws,init,2}},
+    %  {initial_call,{cowboy_protocol,init,4}},
+    %  {status,running},
+    %  {message_queue_len,0},
+    %  {messages,[]},
+    %  {links,[<0.1444.0>,#Port<0.3379>]},
+    %  {dictionary,[]},
+    %  {trap_exit,true},
+    %  {error_handler,error_handler},
+    %  {priority,normal},
+    %  {group_leader,<0.1350.0>},
+    %  {total_heap_size,1635},
+    %  {heap_size,610},
+    %  {stack_size,16},
+    %  {reductions,1427},
+    %  {garbage_collection,[{max_heap_size,#{error_logger => true,kill => true,size => 0}},
+    %                       {min_bin_vheap_size,46422},
+    %                       {min_heap_size,233},
+    %                       {fullsweep_after,65535},
+    %                       {minor_gcs,6}]},
+    %  {suspending,[]}]
     % erlang:start_timer(1000, self(), <<"Hello!">>),
     {cowboy_websocket, Req, Opts}.
 
