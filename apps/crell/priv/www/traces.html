@@ -15,8 +15,8 @@
     <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <!-- Custom styles for this template -->
     <link href="justified-nav.css" rel="stylesheet">
-    <script type="text/javascript" src="angular-1.3.9/angular.min.js">
-    </script>
+    <!-- <script type="text/javascript" src="angular-1.3.9/angular.min.js">
+    </script> -->
     <script type="text/javascript" src="js/traces.js"></script>
 
     <!-- Pagination - http://flaviusmatis.github.io/simplePagination.js/#page-1 -->
@@ -32,7 +32,6 @@
       <!-- The justified navigation menu is meant for single line per list item.
            Multiple lines will require custom code not provided by Bootstrap. -->
       <div class="masthead">
-        <h3 class="text-muted">crell</h3>
         <nav>
           <ul class="nav nav-justified">
             <li><a href="index.html">Home</a></li>
@@ -46,105 +45,77 @@
           </ul>
         </nav>
       </div>
-      <div class="jumbotron">
-
-        <table class="table table-bordered table-striped">
-            <caption>Trace active nodes</caption>
-            <tr>
-                <td>Node</td>
-                <td>Cookie</td>
-                <td>type</td>
-            </tr>
-            <tr ng-repeat='active_trace_node in active_trace_nodes'>
-                <td>
-                    {{active_trace_node.node}}
-                </td>
-                <td>
-                    {{active_trace_node.cookie}}
-                </td>
-                <td>
-                    {{active_trace_node.type}}
-                </td>
-            </tr>
-        </table>
-
-        <!-- Traces: -->
-        <div class="form-inline">
-            <div>
-              Module<input type="text" class="form-control" id="trace_mod" value="ets" />
-              Function<input type="text" class="form-control" id="trace_fun"/>
-              Arity<input type="text" class="form-control" id="trace_ara" />
-              Time<input type="text" class="form-control" id="trace_tim" />
-              Messages<input type="text" class="form-control" id="trace_mes" />
-              <button id="traceBtn">Trace</button>
-            </div>
-        </div>
-
-        <hr />
-
-        <table class="table table-bordered table-striped">
-            <caption>Active Traces</caption>
-            <tr>
-                <td>Node</td>
-                <td>Started</td>
-                <td>Modole</td>
-                <td>Function</td>
-                <td>Arity</td>
-                <td>Trace Options</td>
-            </tr>
-            <tr ng-repeat='active_trace in active_traces'>
-                <td>
-                    {{active_trace.node}}
-                </td>
-                <td>
-                    {{active_trace.started}}
-                </td>
-                <td>
-                    {{active_trace.module}}
-                </td>
-                <td>
-                    {{active_trace.function}}
-                </td>
-                <td>
-                    {{active_trace.arity}}
-                </td>
-                <td>
-                    <ul ng-repeat='opt in active_trace.trace_opts' >
-                        <li ng-repeat='(key, value) in opt'>{{key}}:{{value}}</li>
-                    </ul>
-                </td>
-            </tr>
-        </table>
-
-        <hr />
-
-        <div>
-            <button id="fetchBtn">fetch</button>
-            <select id="fetchSelect"><option value="50" >50</option></select>
-            <button id="clearBtn">Clear</button>
-            <button id="printBtn">Print</button>
-        </div>
+      <!-- <div class="jumbotron"> -->
+      <div class="container-fluid">
 
         <div>
             <table class="table table-bordered table-striped">
-            <caption>Traces</caption>
-            <thead>
-                <tr>
-                    <th>Datetime</th>
-                    <!-- <th>Type</th> -->
-                    <th>Pid</th>
-                    <th>Label</th>
-                    <th>Info</th>
-                    <th>Extra</th>
-                </tr>
-            </thead>
-            <tbody id="traces_table"></tbody>
-        </table>
+                <!-- <caption>Traces</caption> -->
+                <thead>
+                    <tr>
+                        <th colspan="5" />
+
+                            <div class="form-inline">
+                                <label for="add_node">Node</label><input type="text" class="form-control" id="add_node">
+                                <label for="add_node">Cookie</label><input type="text" class="form-control" id="add_cookie">
+                                <label for="add_type">Type</label>
+                                <select class="form-control" id="add_type">
+                                    <option>tcpip_port</option>
+                                    <option>erlang_distribution</option>
+                                </select>
+                                <button id="addNodeBtn">Add</button>
+                                <label for="nodes">Connected Nodes</label>
+                                <select class="form-control" id="nodes"></select>
+                                <button id="disconnectBtn">Disconnect</button>
+                            </div>
+
+                            <div>
+                                <label for="">Module</label>
+                                <!-- <input type="text" class="form-control" id="trace_mod" /> -->
+                                <select id="trace_mod"></select>
+                                <!-- <button id="trace_mod_s">select</button> -->
+                                <label for="">Function</label>
+                                <!-- <input type="text" class="form-control" id="trace_fun"/> -->
+                                <select id="trace_fun"></select>
+                                <!-- <button id="trace_mod_f">select</button> -->
+                                <!-- <label for="">Arity</label> -->
+                                <!-- <input type="text" class="form-control" id="trace_ara" /> -->
+                                <!-- <select id="trace_ara"><option>*</option></select> -->
+                                <!-- <label for="">Time</label>
+                                <input type="text" class="form-control" id="trace_tim" /> -->
+                                <!-- <label for="">Messages</label>
+                                <input type="text" class="form-control" id="trace_mes" /> -->
+                                <button id="traceBtn">Trace</button>
+                                <label for="trace_patterns">Active Traces</label>
+                                <select id="trace_patterns" ></select>
+                                <button id="stopTracePatBtn">Stop Pattern</button>
+                            </div>
+
+                            <hr />
+                            <div>
+                                <button id="fetchBtn">fetch</button>
+                                <select id="fetchSelect"><option value="50" >50</option></select>
+                                <button id="clearBtn">Clear</button>
+                                <button id="printBtn">Print</button>
+                            </div>
+                        </th>
+                    </tr>
+                    <tr>
+                        <th>Datetime</th>
+                        <!-- <th>Type</th> -->
+                        <th>Pid</th>
+                        <th>Label</th>
+                        <th>Info</th>
+                        <th>Extra</th>
+                    </tr>
+                </thead>
+                <tbody id="traces_table"></tbody>
+            </table>
         </div>
 
-     </div>
+     </div> <!-- !jumbotron -->
 
-   </div>
+   </div> <!-- container -->
 
 
 <script type="text/javascript">
@@ -156,41 +127,33 @@
 
     // <pre><code class="html">...</code></pre>
 
-    function process_objs(obj){
+    function process_trace_obj(obj){
 
         var table_row='';
-        switch (obj['type']) {
+        switch (obj['traces']['type']) {
             case 'trace':
                 table_row=
                 '<tr>'+
-                ' <th scope="row">'+obj['datetime']+'</th>'+
-                ' <td>'+obj['pid']+'</td>'+
-                ' <td>'+obj['label']+'</td>'+
-                ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
+                ' <th scope="row">'+obj['traces']['datetime']+'</th>'+
+                ' <td>'+obj['traces']['pid']+'</td>'+
+                ' <td>'+obj['traces']['label']+'</td>'+
+                ' <td><pre><code class="erlang">'+obj['traces']['info']+'</code></pre></td>'+
                 '</tr>';
                 $('#traces_table').append(table_row);
                 break;
             case 'trace_extra':
                 table_row=
                 '<tr>'+
-                ' <th scope="row">'+obj['datetime']+'</th>'+
-                ' <td>'+obj['pid']+'</td>'+
-                ' <td>'+obj['label']+'</td>'+
-                ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
-                ' <td><pre><code class="erlang">'+obj['extra']+'</code></pre></td>'+
+                ' <th scope="row">'+obj['traces']['datetime']+'</th>'+
+                ' <td>'+obj['traces']['pid']+'</td>'+
+                ' <td>'+obj['traces']['label']+'</td>'+
+                ' <td><pre><code class="erlang">'+obj['traces']['info']+'</code></pre></td>'+
+                ' <td><pre><code class="erlang">'+obj['traces']['extra']+'</code></pre></td>'+
                 '</tr>';
                 $('#traces_table').append(table_row);
                 break;
             case 'drop':
-                console.log('Dropped '+obj['dropped']+' trace msgs.');
-                break;
-            case 'active_node':
-                if ( $("#active_nodes option[value='"+obj['name']+"']").length == 0 ){
-                    $('#active_nodes').
-                        append("<option value='"+obj['name']+"'>"+obj['name']+"</option>");
-                } else {
-                    //alert("option does exist!");
-                }
+                console.log('Dropped '+obj['traces']['dropped']+' trace msgs.');
                 break;
         }
     }
@@ -202,22 +165,64 @@
             var socket = new WebSocket(host);
 
             socket.onopen = function(){
-                message('onopen : '+socket.readyState+' (open)');
+                //message('onopen : '+socket.readyState+' (open)');
+                socket.send(JSON.stringify({'get':'nodes'}));
+                socket.send(JSON.stringify({'get':'active_traces'}));
+                socket.send(JSON.stringify({'get':'runtime_modules'}));
             }
 
             socket.onmessage = function(msg){
-                message(msg);
+                if(msg.data=='ok'){
+                    // why did we return ok anyways???...
+                }else{
+                    var json_data = JSON.parse(msg.data);
 
-                var json_data = JSON.parse(msg.data);
-                for(var i = 0; i < json_data.length; i++) {
-                    var obj = json_data[i];
-                    process_objs(obj);
+                    if(json_data.hasOwnProperty('traces')) {
+                        //message('traces');
+                        for(var i = 0; i < json_data['traces'].length; i++) {
+                            var obj = json_data['traces'][i];
+                            process_trace_obj(obj);
+                        }
+                    } else if(json_data.hasOwnProperty('nodes')) {
+                        //message('nodes');
+                        $('#nodes').empty();
+                        for(var i = 0; i < json_data['nodes'].length; i++) {
+                            var obj = json_data['nodes'][i];
+                            $('#nodes').append('<option value='+obj['node']+' >'+obj['node']+'</option>')
+                        }
+                    } else if(json_data.hasOwnProperty('active_traces')) {
+                        //message('active_traces');
+                        // $('#trace_patterns')
+                        $('#trace_patterns').empty();
+                        for(var i = 0; i < json_data['active_traces'].length; i++) {
+                            var obj = json_data['active_traces'][i];
+                            $('#trace_patterns').append('<option value='+obj['id']+' >'
+                                +obj['module']+':'+obj['function']+'/'+obj['arity']
+                                +'</option>')
+                        }
+                    } else if(json_data.hasOwnProperty('runtime_modules')) {
+                        $('#trace_mod').empty();
+                        $('#trace_mod').append('<option value="*" >*</option>');
+                        for(var i = 0; i < json_data['runtime_modules'].length; i++) {
+                            var obj = json_data['runtime_modules'][i];
+                            $('#trace_mod').append('<option value='+obj+' >'+obj+'</option>')
+                        }
+                    } else if(json_data.hasOwnProperty('functions')) {
+                        $('#trace_fun').empty();
+                        $('#trace_fun').append('<option value="*" >*</option>');
+                        for(var i = 0; i < json_data['functions'].length; i++) {
+                            var obj = json_data['functions'][i];
+                            $('#trace_fun').append('<option value='+obj+' >'+obj+'</option>')
+                        }
+                    }
                 }
-
             }
 
             socket.onclose = function(){
-                message('onclose : '+socket.readyState+' (Closed)');
+                //message('onclose : '+socket.readyState+' (Closed)');
+                // Try and reconnect...
+                // maybe create a sleep....
+                // connect();
             }
 
             $('#fetchBtn').click(function(evt){
@@ -233,6 +238,43 @@
                     'mes':$('#trace_mes').val()
                 };
                 socket.send( JSON.stringify( {'trace': trace_json } ));
+            });
+
+            $('#disconnectBtn').click(function(){
+                var ans=confirm('Do you want to disconnect '+$('#nodes option:selected').val());
+                if(ans){
+                    socket.send(JSON.stringify({'module': 'goanna_api',
+                                                'function': 'remove_node',
+                                                'args':
+                                                    [$('#nodes option:selected').val()]
+                                                    //'['+$('#nodes option:selected').val()+']'
+                                               })
+                    );
+                }
+            });
+
+            $('#addNodeBtn').click(function(){
+                socket.send(JSON.stringify({'module':'goanna_api',
+                                            'function':'add_node',
+                                            'args':
+                                                [$('#add_node').val(),
+                                                 $('#add_cookie').val(),
+                                                 $('#add_type').val()]
+                                           })
+                );
+            });
+
+            $('#trace_mod').change(function(){
+                socket.send(JSON.stringify({'module':'crell_server',
+                                            'function':'runtime_module_functions',
+                                            'args':
+                                                [$('#trace_mod').val()]
+                                           })
+                );
+            });
+
+            $('#trace_mod').click(function(){
+                //socket.send(JSON.stringify({''}));
             });
 
         } catch(exception) {

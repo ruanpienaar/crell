@@ -1,38 +1,16 @@
 -module(crell_goanna_api_ws).
 
+-include_lib("goanna/include/goanna.hrl").
+
 -export([init/2]).
 -export([websocket_handle/3]).
 -export([websocket_info/3]).
 
+
 init(Req, Opts) ->
     erlang:register(crell_goanna_api_ws, self()),
     process_flag(trap_exit, true),
-    % io:format("~p~n~p~n", [self(),erlang:process_info(self())]),
-    % OUTPUT:
-    %     <0.1640.0>
-    % [{registered_name,crell_goanna_api_ws},
-    %  {current_function,{crell_goanna_api_ws,init,2}},
-    %  {initial_call,{cowboy_protocol,init,4}},
-    %  {status,running},
-    %  {message_queue_len,0},
-    %  {messages,[]},
-    %  {links,[<0.1444.0>,#Port<0.3379>]},
-    %  {dictionary,[]},
-    %  {trap_exit,true},
-    %  {error_handler,error_handler},
-    %  {priority,normal},
-    %  {group_leader,<0.1350.0>},
-    %  {total_heap_size,1635},
-    %  {heap_size,610},
-    %  {stack_size,16},
-    %  {reductions,1427},
-    %  {garbage_collection,[{max_heap_size,#{error_logger => true,kill => true,size => 0}},
-    %                       {min_bin_vheap_size,46422},
-    %                       {min_heap_size,233},
-    %                       {fullsweep_after,65535},
-    %                       {minor_gcs,6}]},
-    %  {suspending,[]}]
-    % erlang:start_timer(1000, self(), <<"Hello!">>),
+
     {cowboy_websocket, Req, Opts}.
 
 websocket_handle({text, <<"fetch">>}, Req, State) ->
@@ -41,16 +19,78 @@ websocket_handle({text, <<"fetch">>}, Req, State) ->
 % websocket_handle({text, Msg}, Req, State) ->
 %     {reply, {text, << "That's what she said! ", Msg/binary >>}, Req, State};
 
-% {text,<<"{\"fetch\":\"50\"}">>}
 websocket_handle({text, ReqJson}, Req, State) ->
     case jsx:decode(ReqJson) of
+        [{<<"get">>, <<"nodes">>}] ->
+            Json = get_nodes_json(),
+            {reply, {text, Json}, Req, State};
+        [{<<"get">>, <<"active_traces">>}] ->
+            ActiveTracesFull = goanna_api:list_active_traces(),
+            ActiveTraces =
+                lists:foldl(fun({{Node,TrcPattern},Now,TrcOpts}, Acc) ->
+                    case lists:keyfind(TrcPattern, 1, Acc) of
+                        false ->
+                            [{TrcPattern,
+                              crell_web_utils:ens_bin(TrcPattern#trc_pattern.m),
+                              crell_web_utils:ens_bin(undef_function(TrcPattern#trc_pattern.f)),
+                              crell_web_utils:ens_bin(undef_arity(TrcPattern#trc_pattern.a))
+                            }|Acc];
+                        {TrcPattern,_,_,_} ->
+                            Acc
+                    end
+                end, [], ActiveTracesFull),
+            Json  = jsx:encode(
+                [{<<"active_traces">>,
+                    [ [
+                        {<<"module">>,   M},
+                        {<<"function">>, F},
+                        {<<"arity">>,    A}
+                      ] || {_, M,F,A} <- ActiveTraces ]
+                }]
+            ),
+            {reply, {text, Json}, Req, State};
+        [{<<"get">>, <<"runtime_modules">>}] ->
+            JsonRunMods = jsx:encode( [ {<<"runtime_modules">>,
+                                        [ crell_web_utils:ens_bin(Mod) || Mod <- crell_server:runtime_modules() ]}
+                                      ] ),
+            {reply, {text, JsonRunMods}, Req, State};
+        [{<<"module_functions">>}] ->
+            {reply, {text, <<"">>}, Req, State};
+
         [{<<"trace">>, Details}] ->
             ok = trace(Details),
             {reply, {text, <<"ok">>}, Req, State};
+
         [{<<"fetch">>,_SizeBin}] ->
             % _SizeInt = list_to_integer(binary_to_list(SizeBin)),
             Traces = goanna_api:pull_all_traces(),
-            Json = jsx:encode( [ dbg_trace_format_to_json(T) || T <- Traces ] ),
+            Json = jsx:encode( {<<"traces">>, [ dbg_trace_format_to_json(T) || T <- Traces ]} ),
+            {reply, {text, Json}, Req, State};
+
+        [{<<"module">>,<<"goanna_api">>},
+         {<<"function">>,<<"remove_node">>},
+         {<<"args">>,[Node]}] ->
+            %% TODO: how will i handle errors?
+            goanna_api:remove_node(list_to_atom(binary_to_list(Node))),
+            Json = get_nodes_json(),
+            {reply, {text, Json}, Req, State};
+
+        [{<<"module">>,<<"goanna_api">>},
+         {<<"function">>,<<"add_node">>},
+         {<<"args">>,[Node, Cookie, Type]}] ->
+            %% TODO: how will i handle errors?
+            goanna_api:add_node(list_to_atom(binary_to_list(Node)),
+                                      list_to_atom(binary_to_list(Cookie)),
+                                      list_to_atom(binary_to_list(Type))
+                                     ),
+            Json = get_nodes_json(),
+            {reply, {text, Json}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"runtime_module_functions">>},
+         {<<"args">>,[Mod]}] ->
+            Functions = crell_server:runtime_module_functions(list_to_atom(binary_to_list(Mod))),
+            Json = jsx:encode([{<<"functions">>, [ crell_web_utils:ens_bin(atom_to_list(F)++"/"++integer_to_list(Arity))
+                || {F,Arity} <- Functions ]}]),
             {reply, {text, Json}, Req, State};
         A ->
             io:format("~p~n", [A]),
@@ -122,6 +162,28 @@ trace([{<<"mod">>,Mod},
        {<<"mes">>,_Messages}]) ->
     goanna_api:trace(crell_web_utils:ens_atom(Mod), crell_web_utils:ens_atom(Fun), crell_web_utils:ens_int(Arity)).
 
+undef_function(undefined) ->
+    "*";
+undef_function(F) ->
+    F.
+
+undef_arity(undefined) ->
+    "*";
+undef_arity(A) ->
+    A.
+
+proplist_to_json_ready(Props) ->
+    lists:map(fun(KVPair) ->
+        [KVPair]
+    end, Props).
 
 
-
+get_nodes_json() ->
+    Nodes = goanna_api:nodes(),
+    jsx:encode(
+        [{<<"nodes">>,
+            [ [{<<"node">>, crell_web_utils:ens_bin(Node)},
+               {<<"cookie">>, crell_web_utils:ens_bin(Cookie)},
+               {<<"type">>, crell_web_utils:ens_bin(Type)}] || {Node,Cookie,Type} <- Nodes ]
+        }]
+    ).

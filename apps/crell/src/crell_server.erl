@@ -10,6 +10,7 @@
 ]).
 -export([
     runtime_modules/0,
+    runtime_module_functions/1,
     module_source/1,
     redbug_trace/0,
     redbug_trace/1,
@@ -45,7 +46,8 @@
                   traces = [],
                   trace_pid,
                   remote_trace_socket,
-                  remote_trace_port
+                  remote_trace_port,
+                  remote_modules
                 }).
 
 start_link() ->
@@ -74,6 +76,9 @@ remote_which_applications() ->
 
 runtime_modules() ->
     gen_server:call(?MODULE, runtime_modules).
+
+runtime_module_functions(Mod) ->
+    gen_server:call(?MODULE, {runtime_module_functions, Mod}).
 
 %% TODO: make a function that'll create the empty values...
 
@@ -197,7 +202,17 @@ handle_call({pid, Pid}, _From, #?STATE{ remote_node = Node } = State) ->
 handle_call(remote_which_applications, _From, State) ->
    {reply, lists:keyfind(remote_running_applications, 1, State#?STATE.remote_state),State};
 handle_call(runtime_modules, _From, State) ->
-    {reply, lists:keyfind(remote_modules, 1, State#?STATE.remote_state),State};
+    {remote_modules, RM} = lists:keyfind(remote_modules, 1, State#?STATE.remote_state),
+    Mods = lists:map(fun({Mod, _Exports}) -> Mod end, RM),
+    {reply, Mods,State};
+handle_call({runtime_module_functions, Mod}, _From, State) ->
+    {remote_modules, RM} = lists:keyfind(remote_modules, 1, State#?STATE.remote_state),
+    case lists:keyfind(Mod, 1, RM) of
+        false ->
+            {reply, false, State};
+        {Mod, Functions} ->
+            {reply, Functions, State}
+    end;
 handle_call({redbug_trace, Specs, Opts1}, _From, #?STATE{ remote_node = Node } = State) ->
     Trcs = [ redbug_trace_pattern(M, F, A, G, R) || {M,F,A,G,R} <- Specs ],
     Pid = do_trace(Trcs, Opts1, Node),
