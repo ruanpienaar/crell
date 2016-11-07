@@ -130,30 +130,30 @@
     function process_trace_obj(obj){
 
         var table_row='';
-        switch (obj['traces']['type']) {
+        switch (obj['type']) {
             case 'trace':
                 table_row=
                 '<tr>'+
-                ' <th scope="row">'+obj['traces']['datetime']+'</th>'+
-                ' <td>'+obj['traces']['pid']+'</td>'+
-                ' <td>'+obj['traces']['label']+'</td>'+
-                ' <td><pre><code class="erlang">'+obj['traces']['info']+'</code></pre></td>'+
+                ' <th scope="row">'+obj['datetime']+'</th>'+
+                ' <td>'+obj['pid']+'</td>'+
+                ' <td>'+obj['label']+'</td>'+
+                ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
                 '</tr>';
                 $('#traces_table').append(table_row);
                 break;
             case 'trace_extra':
                 table_row=
                 '<tr>'+
-                ' <th scope="row">'+obj['traces']['datetime']+'</th>'+
-                ' <td>'+obj['traces']['pid']+'</td>'+
-                ' <td>'+obj['traces']['label']+'</td>'+
-                ' <td><pre><code class="erlang">'+obj['traces']['info']+'</code></pre></td>'+
-                ' <td><pre><code class="erlang">'+obj['traces']['extra']+'</code></pre></td>'+
+                ' <th scope="row">'+obj['datetime']+'</th>'+
+                ' <td>'+obj['pid']+'</td>'+
+                ' <td>'+obj['label']+'</td>'+
+                ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
+                ' <td><pre><code class="erlang">'+obj['extra']+'</code></pre></td>'+
                 '</tr>';
                 $('#traces_table').append(table_row);
                 break;
             case 'drop':
-                console.log('Dropped '+obj['traces']['dropped']+' trace msgs.');
+                console.log('Dropped '+obj['dropped']+' trace msgs.');
                 break;
         }
     }
@@ -161,7 +161,9 @@
     function connect(){
         try{
             var socket;
-            var host = "ws://localhost:8080/goanna_api/ws";
+            var url = window.location.href;
+            var arr = url.split("/"); 
+            var host = "ws://"+arr[2]+"/goanna_api/ws";
             var socket = new WebSocket(host);
 
             socket.onopen = function(){
@@ -178,21 +180,17 @@
                     var json_data = JSON.parse(msg.data);
 
                     if(json_data.hasOwnProperty('traces')) {
-                        //message('traces');
                         for(var i = 0; i < json_data['traces'].length; i++) {
                             var obj = json_data['traces'][i];
                             process_trace_obj(obj);
                         }
                     } else if(json_data.hasOwnProperty('nodes')) {
-                        //message('nodes');
                         $('#nodes').empty();
                         for(var i = 0; i < json_data['nodes'].length; i++) {
                             var obj = json_data['nodes'][i];
                             $('#nodes').append('<option value='+obj['node']+' >'+obj['node']+'</option>')
                         }
                     } else if(json_data.hasOwnProperty('active_traces')) {
-                        //message('active_traces');
-                        // $('#trace_patterns')
                         $('#trace_patterns').empty();
                         for(var i = 0; i < json_data['active_traces'].length; i++) {
                             var obj = json_data['active_traces'][i];
@@ -214,6 +212,11 @@
                             var obj = json_data['functions'][i];
                             $('#trace_fun').append('<option value='+obj+' >'+obj+'</option>')
                         }
+                    } else if(json_data.hasOwnProperty('traces')) {
+                    	for(var i = 0; i < json_data['traces'].length; i++) {
+                    	    var obj = json_data['traces'][i];
+                    	    
+                    	}
                     }
                 }
             }

@@ -64,7 +64,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
         [{<<"fetch">>,_SizeBin}] ->
             % _SizeInt = list_to_integer(binary_to_list(SizeBin)),
             Traces = goanna_api:pull_all_traces(),
-            Json = jsx:encode( {<<"traces">>, [ dbg_trace_format_to_json(T) || T <- Traces ]} ),
+            Json = jsx:encode( [{<<"traces">>, [ dbg_trace_format_to_json(T) || T <- Traces ]}] ),
             {reply, {text, Json}, Req, State};
 
         [{<<"module">>,<<"goanna_api">>},
@@ -131,6 +131,7 @@ dbg_trace_format_to_json({Now, {trace, Pid, Label, Info}}) ->
      {<<"pid">>, crell_web_utils:ens_bin(Pid)},
      {<<"label">>, crell_web_utils:ens_bin(Label)},
      {<<"info">>, ensure_info(Info)}];
+
 dbg_trace_format_to_json({Now, {trace, Pid, Label, Info, Extra}}) ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
      {<<"type">>, crell_web_utils:ens_bin(trace_extra)},
@@ -138,29 +139,25 @@ dbg_trace_format_to_json({Now, {trace, Pid, Label, Info, Extra}}) ->
      {<<"label">>, crell_web_utils:ens_bin(Label)},
      {<<"info">>, ensure_info(Info)},
      {<<"extra">>, ensure_extra(Extra)}];
+
 dbg_trace_format_to_json({Now, {drop, NumDropped}}) ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
      {<<"type">>, crell_web_utils:ens_bin(drop)},
      {<<"dropped">>, crell_web_utils:ens_bin(NumDropped)}].
 
 trace([{<<"mod">>,Mod},
-       {<<"fun">>,<<>>},
-       {<<"ara">>,<<>>},
-       {<<"tim">>,_Time},
-       {<<"mes">>,_Messages}]) ->
+       {<<"fun">>,<<"*">>}]) ->
     goanna_api:trace(crell_web_utils:ens_atom(Mod));
 trace([{<<"mod">>,Mod},
-       {<<"fun">>,Fun},
-       {<<"ara">>,<<>>},
-       {<<"tim">>,_Time},
-       {<<"mes">>,_Messages}]) ->
-    goanna_api:trace(crell_web_utils:ens_atom(Mod), crell_web_utils:ens_atom(Fun));
-trace([{<<"mod">>,Mod},
-       {<<"fun">>,Fun},
-       {<<"ara">>,Arity},
-       {<<"tim">>,_Time},
-       {<<"mes">>,_Messages}]) ->
-    goanna_api:trace(crell_web_utils:ens_atom(Mod), crell_web_utils:ens_atom(Fun), crell_web_utils:ens_int(Arity)).
+       {<<"fun">>,Fun}]) ->
+    [Func, Ara] = string:tokens(binary_to_list(Fun), "/"),
+    goanna_api:trace(crell_web_utils:ens_atom(Mod), crell_web_utils:ens_atom(Func), crell_web_utils:ens_int(Ara)).
+%%trace([{<<"mod">>,Mod},
+%%       {<<"fun">>,Fun},
+%%       {<<"ara">>,Arity},
+%%       {<<"tim">>,_Time},
+%%       {<<"mes">>,_Messages}]) ->
+%%    goanna_api:trace(crell_web_utils:ens_atom(Mod), crell_web_utils:ens_atom(Fun), crell_web_utils:ens_int(Arity)).
 
 undef_function(undefined) ->
     "*";

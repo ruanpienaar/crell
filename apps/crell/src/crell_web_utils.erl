@@ -14,9 +14,13 @@ ens_bin(V) when is_binary(V) ->
 ens_bin(V) when is_integer(V) ->
     list_to_binary(integer_to_list(V)).
 
+ens_atom(V) when is_list(V) ->
+    list_to_atom(V);
 ens_atom(V) when is_binary(V) ->
     list_to_atom(binary_to_list(V)).
 
+ens_int(V) when is_list(V) ->
+    list_to_integer(V);
 ens_int(V) when is_binary(V) ->
     binary_to_integer(V).
 
