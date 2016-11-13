@@ -63,6 +63,10 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, {}, []).
 
 add_node(Node, Cookie) ->
+
+    %% TODO: Once the node has been added, and the connected event callback was called,
+    % then call the remote_ functionality on the remote server and update state
+
     ConnectedCallBack = [{crell_connect, fun() -> ok=gen_server:cast(?MODULE, {node_conencted, Node, Cookie}) end}],
     DisconnCallBack = [{crell_disconnect, fun() -> ok=gen_server:cast(?MODULE, {node_disconnected, Node, Cookie}) end}],
     case hawk:node_exists(Node) of
