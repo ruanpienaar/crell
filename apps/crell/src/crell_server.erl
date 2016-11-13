@@ -1,6 +1,14 @@
 -module (crell_server).
--export([start_link/0,
-         calc_app/1,
+
+-export([
+    start_link/0,
+    add_node/2,
+    remove_node/2
+]).
+
+
+
+-export([calc_app/1,
          calc_app/2,
          calc_proc/1,
          calc_proc/2,
@@ -47,11 +55,49 @@
                   trace_pid,
                   remote_trace_socket,
                   remote_trace_port,
-                  remote_modules
+                  remote_modules,
+                  nodes=orddict:new()
                 }).
 
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, {}, []).
+
+add_node(Node, Cookie) ->
+    ConnectedCallBack = [{crell_connect, fun() -> ok=gen_server:cast(?MODULE, {node_conencted, Node, Cookie}) end}],
+    DisconnCallBack = [{crell_disconnect, fun() -> ok=gen_server:cast(?MODULE, {node_disconnected, Node, Cookie}) end}],
+    case hawk:node_exists(Node) of
+        {ok, _Pid, Callbacks} ->
+            case lists:member(crell_connect, Callbacks) andalso lists:member(crell_disconnect, Callbacks) of
+                true ->
+                    ok;
+                false ->
+                    [{NC,CCB}] = ConnectedCallBack,
+                    [{ND,DCB}] = DisconnCallBack,
+                    CCB(),
+                    {ok,updated} = hawk:add_connect_callback(Node, {NC,CCB}),
+                    {ok,updated} = hawk:add_disconnect_callback(Node, {ND,DCB}),
+                    ok
+            end;
+        false ->
+            {ok,_} = hawk:add_node(Node, Cookie, ConnectedCallBack, DisconnCallBack),
+            ok
+    end.
+
+remove_node(Node, Cookie) ->
+    case hawk:node_exists(Node) of
+        {ok, _Pid, _Callbacks} ->
+            ok = hawk:remove_node(Node),
+            ok = gen_server:cast(?MODULE, {node_removed, Node, Cookie});
+        false ->
+            ok
+    end.
+
+
+
+
+
+%% Refactor all the below ones.
+%% TODO: add node to all the below calls.
 
 calc_app(App) ->
     calc_app(App,[]).
@@ -136,7 +182,8 @@ init({}) ->
     process_flag(trap_exit, true),
     {ok,Node} = application:get_env(crell, remote_node),
     {ok,Cookie} = application:get_env(crell, remote_cookie),
-    {_, _} = est_rem_conn(Node, Cookie).
+    % {_, _} = est_rem_conn(Node, Cookie).
+    {ok, #?STATE{}}.
 
 est_rem_conn(Node, Cookie) ->
 	case ((erlang:set_cookie(Node,Cookie)) andalso (net_kernel:connect(Node))) of
@@ -246,10 +293,22 @@ handle_call(Request, _From, State) ->
 
 %% --------------------------------------------------------------------------
 
+handle_cast({node_conencted, Node, Cookie}, State) ->
+    {noreply, add_node(Node, Cookie, State)};
+handle_cast({node_disconnected, Node, Cookie}, State) ->
+    {noreply, remove_node(Node, Cookie, State)};
+handle_cast({node_removed, Node, Cookie}, State) ->
+    {noreply, remove_node(Node, Cookie, State)};
 handle_cast({handle_trace, T}, State) ->
     {noreply, State#?STATE{ traces = [T|State#?STATE.traces] }};
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+add_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
+    State#?STATE{ nodes = orddict:store(Node, Cookie, N) }.
+
+remove_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
+    State#?STATE{ nodes = orddict:erase(Node, N) }.
 
 %% --------------------------------------------------------------------------
 

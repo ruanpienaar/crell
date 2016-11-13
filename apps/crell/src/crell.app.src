@@ -11,7 +11,8 @@
                   cowboy,
                   jsx,
                   lager,
-                  crell_crawl
+                  crell_crawl,
+                  goanna
                  ]},
   {mod, { crell_app, []}},
   {env, []}

@@ -23,5 +23,8 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [?CHILD(crell_server, worker)]} }.
+    {ok, { {one_for_one, 5, 10}, [
+        ?CHILD(crell_server, worker)
+        % ?CHILD(crell_nodes, worker)
+    ]} }.
 
