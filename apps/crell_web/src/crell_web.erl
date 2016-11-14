@@ -1,9 +1,14 @@
 -module(crell_web).
--export([start/0,
-         stop/0
+-export([
+        start_link/0,
+        start/0,
+        stop/0
     ]).
 
 -define(COWBOY_REF, http).
+
+start_link() ->
+    start().
 
 start() ->
     {ok,Port} = port(),
@@ -45,14 +50,14 @@ routes() ->
             % {"/goanna_api/nodes", crell_goanna_api, []},
             % {"/goanna_api/list_active_traces", crell_goanna_api, []},
 
-            {"/[...]", cowboy_static, {priv_dir, crell, "/www"}}
+            {"/[...]", cowboy_static, {priv_dir, crell_web, "/www"}}
         ]
      }
     ].
 
 port() ->
     Port = 9876,
-    {ok,application:get_env(crell,http_port, Port)}.
+    {ok,application:get_env(crell_web, http_port, Port)}.
 
 stop() ->
     cowboy:stop_listener(?COWBOY_REF).

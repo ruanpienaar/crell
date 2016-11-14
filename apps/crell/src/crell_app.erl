@@ -10,15 +10,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, _} = crell_trace_sup:start_link(),
-    case crell_sup:start_link() of
-        {ok,S} ->
-            {ok, _} = crell_web:start(),
-            {ok,S};
-        E ->
-            E
-    end.
+    crell_sup:start_link().
 
 stop(_State) ->
-    ok = crell_web:stop(),
     ok.

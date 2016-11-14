@@ -12,6 +12,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
+    % {ok,_} = crell_web:start()
     crell_web_sup:start_link().
 
 stop(_State) ->

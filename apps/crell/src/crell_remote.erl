@@ -1,38 +1,13 @@
 -module(crell_remote).
-
 -record(db, {q, p, links, links2}).
-
-%% Handling:
--export([init/0,
-         state/0
-]).
-
-%% Remote Loaded Code
 -export([
-    loaded_code/0
-]).
-
-%% Supervision diagram
--export([
-    start_appmon/0,
-    calc_app_tree/2
-]).
-
-%% Processes
--export([
+    init/0,
+    state/0,
+    get_remote_modules/0,
+    calc_app_tree/2,
     calc_proc_tree/2,
     non_sys_processes/0
 ]).
-
-%% Tracing:
--export([
-    trace/3,
-    setup_traceing/2
-]).
-
--export([test_function/0]).
--export([another_function/0]).
-
 %%----------------------------------------------------------------------
 %% TODO: maybe poll and updated the state on the remote node.
 
@@ -47,18 +22,14 @@ state() ->
 state(Dict) ->
     {ok, Pid} = start_appmon(),
     RRAs = application:which_applications(),
-    Dict1 = dict:store({remote_appmon_pid, Pid}, Dict),
-    Dict2 = dict:store({remote_modules, loaded_code()}, Dict1),
-    Dict3 = dict:store({remote_running_applications, RRAs}, Dict2),
-    Dict4 = dict:store({remote_all_env, [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ]}, Dict3),
+    Dict1 = dict:store(remote_appmon_pid, Pid, Dict),
+    Dict2 = dict:store(remote_modules, get_remote_modules(), Dict1),
+    Dict3 = dict:store(remote_running_applications, RRAs, Dict2),
+    Dict4 = dict:store(remote_all_env, [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ], Dict3),
     {ok, Dict4}.
 
-%%----------------------------------------------------------------------
-
-loaded_code() ->
+get_remote_modules() ->
     [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
-
-%%----------------------------------------------------------------------
 
 start_appmon() ->
     %% Check erlang versions here...
@@ -110,7 +81,6 @@ calc_app_tree(Name, Opts) ->
             {ok, {[], [], [], []}}
     end.
 
-%% !!! NEW
 calc_proc_tree(Pid, Opts) ->
     Mode = get_opt(info_type, Opts),
     DB = new_db(Mode, Pid),
@@ -420,8 +390,6 @@ format(X) ->
 %%**********************************************************************
 %%----------------------------------------------------------------------
 
-
-
 non_sys_processes() ->
     non_sys_processes(processes(), []).
 
@@ -455,67 +423,3 @@ initial_call(Initial, _Pid) ->
 sys_processes() ->
     [auth, code_server, global_name_server, inet_db,
      mnesia_recover, net_kernel, timer_server, wxe_master].
-
-%%----------------------------------------------------------------------
-
-reg_name(_Host, _Port) ->
-    list_to_atom( atom_to_list(?MODULE) ++ "_tracer" ).
-
-setup_traceing(Host, Port) ->
-    try
-        erlang:exit(reg_name(Host, Port), kill)
-    catch
-        _C:_E ->
-            ok
-    end,
-    {ok, Socket} = gen_tcp:connect(Host, Port, []),
-    true = erlang:register(
-            reg_name(Host, Port),
-            spawn(fun() -> trace_forwarding(Socket) end)
-    ),
-    ok.
-
-trace_forwarding(Socket) ->
-    receive
-        A ->
-            io:format("A:~p\n", [A]),
-            ok = gen_tcp:send(Socket, term_to_binary(A)),
-            trace_forwarding(Socket)
-    end.
-
-trace(M, F, A) when is_integer(A) ->
-    try
-        erlang:exit(whereis(dbg), kill)
-    catch
-        _C:_E ->
-            ok
-    end,
-    {ok, _DbgPid} = dbg:start(),
-    dbg:tpl(M, F, A, cx),
-    dbg:p(all, [c, timestamp]),
-    dbg:tp(code, x),
-    TraceFn =
-        fun (Trace, _) ->
-            reg_name(h,p) ! Trace
-        end,
-    {ok, _Pid} = dbg:tracer(process, {TraceFn, ok}),
-    ok.
-
-test_function() ->
-    test_function1(a).
-
-test_function1(_X) ->
-    test_function2(a, b).
-
-test_function2(_X, _Y) ->
-    ok.
-
-
-another_function() ->
-    another_function2().
-
-another_function2() ->
-    another_function3().
-
-another_function3() ->
-    ok.
