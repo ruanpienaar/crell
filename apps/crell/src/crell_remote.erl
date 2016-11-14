@@ -3,7 +3,9 @@
 -record(db, {q, p, links, links2}).
 
 %% Handling:
--export([init/0]).
+-export([init/0,
+         state/0
+]).
 
 %% Remote Loaded Code
 -export([
@@ -32,24 +34,24 @@
 -export([another_function/0]).
 
 %%----------------------------------------------------------------------
+%% TODO: maybe poll and updated the state on the remote node.
 
 %% TODO: check the type proplist here....
--spec init() -> {ok, proplists:proplist()}.
+-spec init() -> {ok, gb_sets:set()}.
 init() ->
+    state().
+
+state() ->
+    state(dict:new()).
+
+state(Dict) ->
     {ok, Pid} = start_appmon(),
-    RMs = loaded_code(),
     RRAs = application:which_applications(),
-
-    % [ application:get_all_env(App) || App <- RRAs ]
-    % RAe = application:get_all_env(),
-
-    RemoteState = [
-        {rmeote_appmon_pid, Pid},
-        {remote_modules, RMs},
-        {remote_running_applications, RRAs},
-        {remote_all_env, [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ]}
-    ],
-    {ok, RemoteState}.
+    Dict1 = dict:store({remote_appmon_pid, Pid}, Dict),
+    Dict2 = dict:store({remote_modules, loaded_code()}, Dict1),
+    Dict3 = dict:store({remote_running_applications, RRAs}, Dict2),
+    Dict4 = dict:store({remote_all_env, [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ]}, Dict3),
+    {ok, Dict4}.
 
 %%----------------------------------------------------------------------
 
@@ -61,7 +63,12 @@ loaded_code() ->
 start_appmon() ->
     %% Check erlang versions here...
     %% appmon:start().
-    appmon_info:start_link(node(), self(), []).
+    case whereis(appmon_info) of
+        undefined ->
+            appmon_info:start_link2(node(), self(), []);
+        Pid ->
+            {ok, Pid}
+    end.
 
 %%----------------------------------------------------------------------
 %%**********************************************************************

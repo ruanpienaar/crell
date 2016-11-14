@@ -63,10 +63,6 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, {}, []).
 
 add_node(Node, Cookie) ->
-
-    %% TODO: Once the node has been added, and the connected event callback was called,
-    % then call the remote_ functionality on the remote server and update state
-
     ConnectedCallBack = [{crell_connect, fun() -> ok=gen_server:cast(?MODULE, {node_conencted, Node, Cookie}) end}],
     DisconnCallBack = [{crell_disconnect, fun() -> ok=gen_server:cast(?MODULE, {node_disconnected, Node, Cookie}) end}],
     case hawk:node_exists(Node) of
@@ -184,53 +180,7 @@ non_sys_processes() ->
 
 init({}) ->
     process_flag(trap_exit, true),
-    {ok,Node} = application:get_env(crell, remote_node),
-    {ok,Cookie} = application:get_env(crell, remote_cookie),
-    % {_, _} = est_rem_conn(Node, Cookie).
     {ok, #?STATE{}}.
-
-est_rem_conn(Node, Cookie) ->
-	case ((erlang:set_cookie(Node,Cookie)) andalso (net_kernel:connect(Node))) of
-        true ->
-		    start_remote_code(Node, Cookie);
-        false ->
-            {stop, {enoconnect,[{node,Node},{cookie,Cookie}]}}
-    end.
-
-start_remote_code(Node,Cookie) ->
-	{ok,V} = application:get_env(crell, remote_action),
-	case V of
-		1 ->
-			% try loading module
-			case inject_module(crell_remote, Node) of
-				ok ->
-					%% TODO: know that it's started properly
-                    %% TODO: build a funtion, to refresh remote state...
-					{ok, RemoteState} = rpc:call(Node, crell_remote, init, []),
-					{ok,state(Node, Cookie, RemoteState)};
-				_ ->
-					{stop, enotloaded}
-			end;
-		2 ->
-			% TODO: try lib
-			%% rpc:call(Node, crell_remote, init, []),
-			{ok,state(Node, Cookie)};
-		3 ->
-			% TODO: try loading, then lib,
-			%% case inject_module(crell_remote,Node) of
-			%%% TODO: complete it
-			{ok,state(Node, Cookie)};
-		undefined ->
-			{ok,state(Node, Cookie)}
-	end.
-
-state(Node, Cookie) ->
-	state(Node, Cookie, []).
-
-state(Node, Cookie, RemoteState) when is_list(RemoteState) ->
-    #?STATE{remote_node=Node,
-            remote_node_cookie=Cookie,
-            remote_state=RemoteState}.
 
 handle_call({app,App,Opts}, _From, #?STATE{ remote_node = Node } = State) ->
     R = rpc:call(Node,crell_remote,calc_app_tree,[App, Opts]),
@@ -239,7 +189,6 @@ handle_call({pid,Pid,Opts}, _From, #?STATE{ remote_node = Node } = State) ->
     R = rpc:call(Node,crell_remote,calc_proc_tree,[Pid, Opts]),
     {reply, R, State};
 handle_call({app_env,AppName}, _From, #?STATE{ remote_node = _Node } = State) ->
-
     %% TODO: find only the required app env from the proplist
     {remote_all_env, AllAppEnv}
         = lists:keyfind(remote_all_env, 1, State#?STATE.remote_state),
@@ -252,17 +201,18 @@ handle_call({pid, Pid}, _From, #?STATE{ remote_node = Node } = State) ->
     %% TODO: also build a all app env....
 handle_call(remote_which_applications, _From, State) ->
    {reply, lists:keyfind(remote_running_applications, 1, State#?STATE.remote_state),State};
-handle_call(runtime_modules, _From, State) ->
-    {remote_modules, RM} = lists:keyfind(remote_modules, 1, State#?STATE.remote_state),
-    Mods = lists:map(fun({Mod, _Exports}) -> Mod end, RM),
-    {reply, Mods,State};
+handle_call(runtime_modules, _From, #?STATE{remote_node=Node} = State) ->
+    {ok, UpdatedRemoteState} = rpc:call(Node, crell_remote, state, []),
+    {remote_modules, RM} = lists:keyfind(remote_modules, 1, UpdatedRemoteState),
+    Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, RM)),
+    {reply, Mods, State#?STATE{ remote_state = UpdatedRemoteState }};
 handle_call({runtime_module_functions, Mod}, _From, State) ->
     {remote_modules, RM} = lists:keyfind(remote_modules, 1, State#?STATE.remote_state),
     case lists:keyfind(Mod, 1, RM) of
         false ->
             {reply, false, State};
         {Mod, Functions} ->
-            {reply, Functions, State}
+            {reply, lists:sort(Functions), State}
     end;
 handle_call({redbug_trace, Specs, Opts1}, _From, #?STATE{ remote_node = Node } = State) ->
     Trcs = [ redbug_trace_pattern(M, F, A, G, R) || {M,F,A,G,R} <- Specs ],
@@ -309,47 +259,35 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 add_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
-    State#?STATE{ nodes = orddict:store(Node, Cookie, N) }.
+    {ok, RemoteState} = start_remote_code(Node, Cookie),
+    State#?STATE{ nodes = orddict:store(Node, RemoteState, N) }.
 
-remove_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
+remove_node(Node, _Cookie, #?STATE{ nodes = N } = State) ->
     State#?STATE{ nodes = orddict:erase(Node, N) }.
 
-%% --------------------------------------------------------------------------
+start_remote_code(Node,Cookie) ->
+    case application:get_env(crell, remote_action) of
+        {ok, 1} ->
+            % try loading module
+            case inject_module(crell_remote, Node) of
+                ok ->
+                    {ok, _RemoteState} = rpc:call(Node, crell_remote, init, []);
+                _ ->
+                    {stop, enotloaded}
+            end;
+        {ok, 2} ->
+            % TODO: try lib, and call remote state
+            %% rpc:call(Node, crell_remote, init, []),
+            {ok, todo_get_remote_state};
+        {ok, 3} ->
+            % TODO: try loading, then lib,
+            %% case inject_module(crell_remote,Node) of
+            %%% TODO: complete it
+            {ok, todo_get_remote_state};
+        undefined ->
+            {ok, todo_get_remote_state}
+    end.
 
-handle_info({tcp, Socket, Data},
-        #?STATE{ remote_trace_socket = Socket } = State) ->
-    ok = inet:setopts(Socket,[{active, once}]),
-    do_handle_tcp(Data),
-    {noreply, State};
-handle_info({tcp_closed,_Socket},State) ->
-    reopen_connection(),
-    {noreply, State};
-handle_info({tcp_error, _Socket, _Reason},
-        #?STATE{ remote_trace_socket = Socket } = State) ->
-    ok = gen_tcp:close(Socket),
-    {noreply, State#?STATE{ remote_trace_socket = undefined,
-                            remote_trace_port = undefined}};
-handle_info({'EXIT', Pid, Reason}, State) when Pid == State#?STATE.trace_pid ->
-    io:format("trace handle_info ~p\n\n", [{'EXIT', Pid, Reason}]),
-    {noreply, State#?STATE{ trace_pid = undefined }};
-handle_info({'EXIT', Pid, Reason}, State) when Pid == State#?STATE.trace_pid ->
-    io:format("handle_info ~p\n\n", [{'EXIT', Pid, Reason}]),
-    {noreply, State};
-handle_info(Info, State) ->
-    io:format("handle_info ~p\n\n", [Info]),
-    {noreply, State}.
-
-%% --------------------------------------------------------------------------
-
-terminate(_Reason, _State) ->
-    ok.
-
-%% --------------------------------------------------------------------------
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-%% --------------------------------------------------------------------------
 
 -spec inject_module(ModName :: term(), NodeName :: atom()) ->
                                         ok | {error, Reason :: term()}.
@@ -411,6 +349,44 @@ hard_purge_module(Node, Module) ->
         C:E ->
             {error, {C,E}}
     end.
+
+%% --------------------------------------------------------------------------
+
+handle_info({tcp, Socket, Data},
+        #?STATE{ remote_trace_socket = Socket } = State) ->
+    ok = inet:setopts(Socket,[{active, once}]),
+    do_handle_tcp(Data),
+    {noreply, State};
+handle_info({tcp_closed,_Socket},State) ->
+    reopen_connection(),
+    {noreply, State};
+handle_info({tcp_error, _Socket, _Reason},
+        #?STATE{ remote_trace_socket = Socket } = State) ->
+    ok = gen_tcp:close(Socket),
+    {noreply, State#?STATE{ remote_trace_socket = undefined,
+                            remote_trace_port = undefined}};
+handle_info({'EXIT', Pid, Reason}, State) when Pid == State#?STATE.trace_pid ->
+    io:format("trace handle_info ~p\n\n", [{'EXIT', Pid, Reason}]),
+    {noreply, State#?STATE{ trace_pid = undefined }};
+handle_info({'EXIT', Pid, Reason}, State) when Pid == State#?STATE.trace_pid ->
+    io:format("handle_info ~p\n\n", [{'EXIT', Pid, Reason}]),
+    {noreply, State};
+handle_info(Info, State) ->
+    io:format("handle_info ~p\n\n", [Info]),
+    {noreply, State}.
+
+%% --------------------------------------------------------------------------
+
+terminate(_Reason, _State) ->
+    ok.
+
+%% --------------------------------------------------------------------------
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%% --------------------------------------------------------------------------
+
 
 %% This is to follow a function to another....
 make_xref() ->
