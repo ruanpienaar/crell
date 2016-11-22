@@ -16,7 +16,7 @@
     nodes/0,
     runtime_modules/1,
     runtime_module_functions/2,
-    module_source/2,
+    %module_source/2,
     non_sys_processes/1,
     calc_app/2,
     calc_app/3,
@@ -56,13 +56,8 @@ add_node(Node, Cookie) ->
     end.
 
 remove_node(Node, Cookie) ->
-    case hawk:node_exists(Node) of
-        {ok, _Pid, _Callbacks} ->
-            ok = hawk:remove_node(Node),
-            ok = gen_server:cast(?MODULE, {node_removed, Node, Cookie});
-        false ->
-            ok
-    end.
+    ok = purge_module(Node, crell_remote),
+    ok = hawk:remove_node(Node).
 
 nodes() ->
     gen_server:call(?MODULE, nodes).
@@ -73,8 +68,8 @@ runtime_modules(Node) ->
 runtime_module_functions(Node, Mod) ->
     gen_server:call(?MODULE, {runtime_module_functions, Node, Mod}).
 
-module_source(_Node, Module) ->
-    get_source(Module).
+% module_source(_Node, Module) ->
+%     get_source(Module).
 
 non_sys_processes(Node) ->
     gen_server:call(?MODULE, {non_sys_processes, Node}).
@@ -86,16 +81,13 @@ calc_app(Node, App, Opts) ->
     gen_server:call(?MODULE, {app, Node, App, Opts}).
 
 calc_proc(Node, Pid) ->
-    calc_proc(Pid, []).
+    calc_proc(Node, Pid, []).
 
 calc_proc(Node, Pid, Opts) ->
     gen_server:call(?MODULE, {proc, Node, Pid, Opts}).
 
 calc_app_env(Node, AppName) ->
    gen_server:call(?MODULE, {app_env, Node, AppName}).
-
-calc_pid(Node, Pid) ->
-    gen_server:call(?MODULE, {pid, Node, Pid}).
 
 remote_which_applications(Node) ->
    gen_server:call(?MODULE, {remote_which_applications, Node}).
@@ -116,13 +108,11 @@ node_ordict_values(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
             {ok, {error, {unknown_node, Node}}, State}
     end.
 
+%% TODO: rather make explicit remote update calls, update_remote_modules
 do_get_values(Node, RemoteState, get_remote_modules) ->
-    %% Maybe cache, and check last cache time, and only then update....
-    %% Seems quite costly
-    UpdatedRemoteModules = rpc:call(Node, crell_remote, get_remote_modules, []),
-    Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, UpdatedRemoteModules)),
-    UpdatedRemoteState = dict:store(remote_modules, UpdatedRemoteModules, RemoteState),
-    {ok, Mods, UpdatedRemoteState};
+    RemoteModules = dict:fetch(remote_modules, RemoteState),
+    Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, RemoteModules)),
+    {ok, Mods, RemoteState};
 do_get_values(Node, RemoteState, {get_remote_module_functions, Mod}) ->
     RemoteModules = dict:fetch(remote_modules, RemoteState),
     case lists:keyfind(Mod, 1, RemoteModules) of
@@ -136,7 +126,16 @@ do_get_values(Node, RemoteState, non_sys_processes) ->
     ProcList = rpc:call(Node, crell_remote, non_sys_processes, []),
     {ok, ProcList, RemoteState};
 do_get_values(Node, RemoteState, {app_env, AppName}) ->
-    {ok, AppEnv, UpdatedRemoteState}.
+    RemoteAllEnv = dict:fetch(remote_all_env, RemoteState),
+    case lists:keyfind(AppName, 1, RemoteAllEnv) of
+        false ->
+            {ok, false, RemoteState};
+        {App, AppEnv} ->
+            {ok, AppEnv, RemoteState}
+    end;
+do_get_values(Node, RemoteState, remote_which_applications) ->
+    RemoteApps = dict:fetch(remote_running_applications, RemoteState),
+    {ok, RemoteApps, RemoteState}.
 
 handle_call(nodes, _From, State) ->
     Nodes = orddict:fetch_keys(State#?STATE.nodes),
@@ -153,9 +152,6 @@ handle_call({non_sys_processes, Node}, _From, State) ->
 handle_call({app, Node, App, Opts}, _From, State) ->
     R = rpc:call(Node,crell_remote,calc_app_tree,[App, Opts]),
     {reply, R, State};
-handle_call({proc, Node, Pid, Opts}, _From, State) ->
-    R = rpc:call(Node,crell_remote,calc_proc_tree,[Pid, Opts]),
-    {reply, R, State};
 handle_call({app_env, Node, AppName}, _From, State) ->
     {ok, Reply, NewState} = node_ordict_values(Node, State, {app_env, AppName}),
     {reply, Reply, NewState};
@@ -164,12 +160,11 @@ handle_call({pid, Node, Pid}, _From, State) ->
     {reply, R, State};
     %% TODO: also build a all app env....
 handle_call({remote_which_applications, Node}, _From, State) ->
-    RemoteRunningApplications = [], %% lists:keyfind(remote_running_applications, 1, State#?STATE.remote_state)
-    {reply, RemoteRunningApplications, State};
+    {ok, Reply, _} = node_ordict_values(Node, State, remote_which_applications),
+    {reply, Reply, State};
 handle_call(Request, _From, State) ->
     {reply, {error, unknown_call, ?MODULE, Request}, State}.
 %% --------------------------------------------------------------------------
-
 handle_cast({node_connected, Node, Cookie}, State) ->
     {noreply, add_node(Node, Cookie, State)};
 handle_cast({node_disconnected, Node, Cookie}, State) ->
@@ -198,7 +193,6 @@ add_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
     State#?STATE{ nodes = orddict:store(Node, RemoteState, N) }.
 
 remove_node(Node, _Cookie, #?STATE{ nodes = N } = State) ->
-    purge_module(Node, crell_remote),
     State#?STATE{ nodes = orddict:erase(Node, N) }.
 
 start_remote_code(Node,Cookie) ->
@@ -278,7 +272,7 @@ hard_purge_module(Node, Module) ->
             lager:info("Purging killed processes on ~p while loading ~p", [Node, Module]),
             ok;
         false ->
-            ok;
+            lager:warning("Could not code:purge ~p~n", [Module]);
         {badrpc, _} = RPCError ->
             {error, RPCError}
     catch
@@ -301,18 +295,18 @@ fun_src(Mod, Fun, Arity) ->
     [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
     lists:flatten(erl_pp:form(FF)).
 
--spec get_source(module() | {module(), function(), Arity :: non_neg_integer()}) -> {ok, string()} | {error, Reason :: any()}.
-get_source(What) ->
-        try
-        case What of
-                {M,F,A} ->
-                        {ok, fun_src(M,F,A)};
-                Mod when is_atom(Mod)->
-                        {ok, mod_src(Mod)}
-        end
-        catch _:E ->
-                {error, E}
-        end.
+% -spec get_source(module() | {module(), function(), Arity :: non_neg_integer()}) -> {ok, string()} | {error, Reason :: any()}.
+% get_source(What) ->
+%         try
+%         case What of
+%                 {M,F,A} ->
+%                         {ok, fun_src(M,F,A)};
+%                 Mod when is_atom(Mod)->
+%                         {ok, mod_src(Mod)}
+%         end
+%         catch _:E ->
+%                 {error, E}
+%         end.
 
 %% This is to follow a function to another....
 make_xref(_Node) ->

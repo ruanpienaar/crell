@@ -6,7 +6,8 @@
     get_remote_modules/0,
     calc_app_tree/2,
     calc_proc_tree/2,
-    non_sys_processes/0
+    non_sys_processes/0,
+    get_app_env/0
 ]).
 %%----------------------------------------------------------------------
 %% TODO: maybe poll and updated the state on the remote node.
@@ -21,11 +22,11 @@ state() ->
 
 state(Dict) ->
     {ok, Pid} = start_appmon(),
-    RRAs = application:which_applications(),
+    RRAs = running_apps(),
     Dict1 = dict:store(remote_appmon_pid, Pid, Dict),
     Dict2 = dict:store(remote_modules, get_remote_modules(), Dict1),
     Dict3 = dict:store(remote_running_applications, RRAs, Dict2),
-    Dict4 = dict:store(remote_all_env, [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ], Dict3),
+    Dict4 = dict:store(remote_all_env, get_app_env(RRAs), Dict3),
     {ok, Dict4}.
 
 get_remote_modules() ->
@@ -423,3 +424,13 @@ initial_call(Initial, _Pid) ->
 sys_processes() ->
     [auth, code_server, global_name_server, inet_db,
      mnesia_recover, net_kernel, timer_server, wxe_master].
+
+running_apps() ->
+    application:which_applications().
+
+get_app_env() ->
+    RRAs = running_apps(),
+    get_app_env(RRAs).
+
+get_app_env(RRAs) ->
+    [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ].
