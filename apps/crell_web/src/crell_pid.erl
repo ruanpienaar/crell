@@ -34,10 +34,9 @@ content_types_provided(Req, _State) ->
 
 handle_json(Req, #?STATE{ pid = undefined} = State) ->
     {ok,Data} = crell_server:non_sys_processes(),
-    % io:format("~p~n~n", [Data]),
     Json = to_proc_proplist_json(Data),
     {Json,Req,State};
-handle_json(Req, #?STATE{ pid = P} = State) when P /= undefined ->
+handle_json(Req, #?STATE{ pid = P } = State) when P /= undefined ->
     {ok,Data} = crell_server:calc_proc(State#?STATE.pid),
     Json = to_json(Data),
     {Json,Req,State}.

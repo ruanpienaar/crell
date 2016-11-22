@@ -5,7 +5,7 @@
 
 -define(SERVER, ?MODULE).
 -define(STATE, crell_server_state).
--record(?STATE, { 
+-record(?STATE, {
     nodes=orddict:new()
 }).
 
@@ -106,40 +106,49 @@ init({}) ->
     process_flag(trap_exit, true),
     {ok, #?STATE{}}.
 
+node_ordict_values(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
+    case orddict:find(Node, Nodes) of
+        {ok, RemoteState} ->
+            {ok, Response, UpdatedRemoteState} = do_get_values(Node, RemoteState, LookupValue),
+            UpdatedState = State#?STATE{ nodes = orddict:store(Node, UpdatedRemoteState, Nodes) },
+            {ok, Response, UpdatedState};
+        error ->
+            {ok, {error, {unknown_node, Node}}, State}
+    end.
+
+do_get_values(Node, RemoteState, get_remote_modules) ->
+    %% Maybe cache, and check last cache time, and only then update....
+    %% Seems quite costly
+    UpdatedRemoteModules = rpc:call(Node, crell_remote, get_remote_modules, []),
+    Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, UpdatedRemoteModules)),
+    UpdatedRemoteState = dict:store(remote_modules, UpdatedRemoteModules, RemoteState),
+    {ok, Mods, UpdatedRemoteState};
+do_get_values(Node, RemoteState, {get_remote_module_functions, Mod}) ->
+    RemoteModules = dict:fetch(remote_modules, RemoteState),
+    case lists:keyfind(Mod, 1, RemoteModules) of
+        false ->
+            %% Maybe update when not found...
+            {ok, false, RemoteState};
+        {Mod, Functions} ->
+            {ok, lists:sort(Functions), RemoteState}
+    end;
+do_get_values(Node, RemoteState, non_sys_processes) ->
+    ProcList = rpc:call(Node, crell_remote, non_sys_processes, []),
+    {ok, ProcList, RemoteState};
+do_get_values(Node, RemoteState, {app_env, AppName}) ->
+    {ok, AppEnv, UpdatedRemoteState}.
+
 handle_call(nodes, _From, State) ->
     Nodes = orddict:fetch_keys(State#?STATE.nodes),
     {reply, Nodes, State};
-handle_call({runtime_modules, Node}, _From, #?STATE{ nodes = N } = State) ->
-    case orddict:find(Node, N) of
-        {ok, RemoteState} ->
-            UpdatedRemoteModules = rpc:call(Node, crell_remote, get_remote_modules, []),
-            Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, UpdatedRemoteModules)),
-            UpdatedRemoteState = dict:store(remote_modules, UpdatedRemoteModules, RemoteState),
-            {reply, {ok, Mods}, State#?STATE{ nodes = orddict:store(Node, UpdatedRemoteState, N) }};
-        error ->
-            {reply, {error, {unknown_node, Node}}, State}
-    end;
-    % emote_modules, RM} = lists:keyfind(remote_modules, 1, UpdatedRemoteState),
-    % Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, RM)),
-    % {reply, Mods, State};
+handle_call({runtime_modules, Node}, _From, State) ->
+    {ok, Reply, NewState} = node_ordict_values(Node, State, get_remote_modules),
+    {reply, Reply, NewState};
 handle_call({runtime_module_functions, Node, Mod}, _From, State) ->
-    % {remote_modules, RM} = lists:keyfind(remote_modules, 1, State#?STATE.remote_state),
-    % case lists:keyfind(Mod, 1, RM) of
-    %     false ->
-    %         {reply, false, State};
-    %     {Mod, Functions} ->
-    %         {reply, lists:sort(Functions), State}
-    % end;
-    {reply, [], State};
+    {ok, Reply, _} = node_ordict_values(Node, State, {get_remote_module_functions, Mod}),
+    {reply, Reply, State};
 handle_call({non_sys_processes, Node}, _From, State) ->
-    Reply = 
-        case orddict:find(Node, State#?STATE.nodes) of
-            {ok, _} ->
-                ProcList = rpc:call(Node, crell_remote, non_sys_processes, []),
-                {ok, ProcList};
-            error ->
-                {error, {unknown_node, Node}}
-        end,
+    {ok, Reply, _} = node_ordict_values(Node, State, non_sys_processes),
     {reply, Reply, State};
 handle_call({app, Node, App, Opts}, _From, State) ->
     R = rpc:call(Node,crell_remote,calc_app_tree,[App, Opts]),
@@ -148,13 +157,8 @@ handle_call({proc, Node, Pid, Opts}, _From, State) ->
     R = rpc:call(Node,crell_remote,calc_proc_tree,[Pid, Opts]),
     {reply, R, State};
 handle_call({app_env, Node, AppName}, _From, State) ->
-    %% TODO: find only the required app env from the proplist
-    % {remote_all_env, AllAppEnv}
-    %     = lists:keyfind(remote_all_env, 1, State#?STATE.remote_state),
-    % {AppName, AppEnv}
-    %     = lists:keyfind(AppName, 1, AllAppEnv),
-    AppEnv = [],
-    {reply, AppEnv, State};
+    {ok, Reply, NewState} = node_ordict_values(Node, State, {app_env, AppName}),
+    {reply, Reply, NewState};
 handle_call({pid, Node, Pid}, _From, State) ->
     R = rpc:call(Node,crell_remote,calc_proc_tree,[Pid, []]),
     {reply, R, State};
