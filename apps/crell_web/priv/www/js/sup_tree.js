@@ -32,7 +32,7 @@
                 $('#nodes').append('<option value='+node+' >'+node+'</option>');
             }
             if(json_data.nodes.length>0){
-                get_application(json_data.nodes[0]);
+                get_applications(json_data.nodes[0]);
             }else{
                   alert('no nodes added');
             }
@@ -48,7 +48,7 @@
         }
     }
 
-    function get_application(node){
+    function get_applications(node){
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'remote_which_applications',
                                 'args':
@@ -58,7 +58,7 @@
     };
 
     $('#nodes').change(function(){
-        get_application($('#nodes').val());
+        get_applications($('#nodes').val());
     });
 
   });

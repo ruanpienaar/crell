@@ -32,23 +32,29 @@ routes() ->
      {'_',
         [
             {"/",cowboy_static, {priv_file, crell, "www/index.html"}},
-            {"/crell_proc/app/:app_name", crell_proc, []},
+
+                {"/crell_proc/app/:app_name/node/:node", crell_proc, []},
+
             {"/crell_proc/apps", crell_apps, []},
             {"/crell_proc/pid/:pid", crell_pid, []},
             {"/crell_proc/pids/", crell_pid, []},
+
             {"/crell_crawl/dir/:dir_name", crell_crawl_dir, []},
             {"/crell_crawl/dir/content/:file_name", crell_crawl_dir, []},
+
             {"/crell_app_env/:app_name", crell_app_env, []},
+
             {"/crell_mod/all", crell_mod, []},
             {"/crell_mod/trace/:module", crell_mod_trace, []},
+
             {"/crell_traces", crell_traces, []},
             {"/crell_call_graph/:module", crell_call_graph_rest, []},
+
             {"/crell_process_info", crell_process_info, []},
 
             %% Goanna integration:
             {"/goanna_api/ws", crell_goanna_api_ws, []},
-            % {"/goanna_api/nodes", crell_goanna_api, []},
-            % {"/goanna_api/list_active_traces", crell_goanna_api, []},
+            {"/crell/ws", crell_ws_api, []},
 
             {"/[...]", cowboy_static, {priv_dir, crell_web, "/www"}}
         ]

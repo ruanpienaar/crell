@@ -31,34 +31,18 @@
                 var node = json_data.nodes[n];
                 $('#nodes').append('<option value='+node+' >'+node+'</option>');
             }
-            if(json_data.nodes.length>0){
-                get_application(json_data.nodes[0]);
-            }else{
-                  alert('no nodes added');
-            }
-        } else if (json_data.hasOwnProperty('node_apps')) {
-            $('#apps_table').empty();
-            for(var n in json_data.node_apps){
-                var napp = json_data.node_apps[n];
-                $('#apps_table').append('<tr><td>'+
-                    napp.name+'</td><td>'+
-                    napp.erts_vsn+'</td><td>'+
-                    napp.vsn+'</td></tr>');
-            }
         }
     }
 
-    function get_application(node){
+    $('#save_node').click(function(){
+        //alert('save');
         ws.send(JSON.stringify({'module':'crell_server',
-                                'function':'remote_which_applications',
+                                'function':'add_node',
                                 'args':
-                                    [node]
+                                    [$('#node').val(),
+                                     $('#cookie').val()]
                                })
         );
-    };
-
-    $('#nodes').change(function(){
-        get_application($('#nodes').val());
     });
 
   });

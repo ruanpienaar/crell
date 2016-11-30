@@ -9,17 +9,24 @@
         ]).
 
 -define(STATE,crell_proc_state).
--record(?STATE,{app_name}).
+-record(?STATE,{app_name, node}).
 
 init(Req, Opts) ->
     {cowboy_rest, Req, Opts}.
 
 content_types_provided(Req, State) ->
     AppName = cowboy_req:binding(app_name,Req),
-    {[{<<"application/json">>, handle_json}], Req, #?STATE{ app_name = list_to_atom(binary_to_list(AppName)) }}.
+    Node = cowboy_req:binding(node,Req),
+    {
+     [{<<"app_name/json">>, handle_json}],
+     Req,
+     #?STATE{ app_name = crell_web_utils:ens_atom(AppName),
+              node = crell_web_utils:ens_atom(Node)
+     }
+    }.
 
-handle_json(Req, State) ->
-    {ok,Data} = crell_server:calc_app(State#?STATE.app_name),
+handle_json(Req, #?STATE{ app_name = AppName, node = Node } = State) ->
+    {ok,Data} = crell_server:calc_app(Node, AppName),
     Json = to_json(Data),
     {Json,Req,State}.
 
