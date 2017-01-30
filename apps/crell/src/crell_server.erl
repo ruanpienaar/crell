@@ -31,12 +31,19 @@
          purge_module/2
 ]).
 
+%% TODO: choose a better data structure, or use ets...
+%% The orddict, is not coping with the amounts of data from the module function exports...
+
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, {}, []).
 
+
+%% TODO: extremely slow adding nodes, block other nodes from being added...FIXME
 add_node(Node, Cookie) ->
-    ConnectedCallBack = [{crell_connect, fun() -> ok=gen_server:cast(?MODULE, {node_connected, Node, Cookie}) end}],
-    DisconnCallBack = [{crell_disconnect, fun() -> ok=gen_server:cast(?MODULE, {node_disconnected, Node, Cookie}) end}],
+    ConnectedCallBack = [{crell_connect, fun() ->
+        ok=gen_server:call(?MODULE, {node_connected, Node, Cookie}, infinity) end}],
+    DisconnCallBack = [{crell_disconnect, fun() ->
+        ok=gen_server:call(?MODULE, {node_disconnected, Node, Cookie}, infinity) end}],
     case hawk:node_exists(Node) of
         {ok, _Pid, Callbacks} ->
             case lists:member(crell_connect, Callbacks) andalso lists:member(crell_disconnect, Callbacks) of
@@ -60,7 +67,7 @@ remove_node(Node) ->
     ok = hawk:remove_node(Node).
 
 nodes() ->
-    gen_server:call(?MODULE, nodes).
+    gen_server:call(?MODULE, nodes, infinity).
 
 %% Maybe we should bundle modules per application ?
 
@@ -171,23 +178,28 @@ handle_call({pid, Node, Pid}, _From, State) ->
     %% TODO: also build a all app env....
 handle_call({remote_which_applications, Node}, _From, State) ->
     % Update state here
-
     % {ok, RemoteState} = start_remote_code(Node, Cookie),
     % State#?STATE{ nodes = orddict:store(Node, RemoteState, N) }.
-
     %{ok, RemoteState} = remote_state(),
-
     {ok, Reply, _} = node_ordict_values(Node, State, remote_which_applications),
     {reply, Reply, State};
+handle_call(E={node_connected, Node, Cookie}, _From, State) ->
+    crell_notify:action({node_connecting, Node}),
+    NewState = add_node(Node, Cookie, State),
+    crell_notify:action(E),
+    {reply, ok, NewState};
+handle_call(E={node_disconnected, Node, Cookie}, _From, State) ->
+    crell_notify:action(E),
+    {reply, ok, remove_node(Node, Cookie, State)};
 handle_call(Request, _From, State) ->
     {reply, {error, unknown_call, ?MODULE, Request}, State}.
 %% --------------------------------------------------------------------------
-handle_cast({node_connected, Node, Cookie}, State) ->
-    {noreply, add_node(Node, Cookie, State)};
-handle_cast({node_disconnected, Node, Cookie}, State) ->
-    {noreply, remove_node(Node, Cookie, State)};
-handle_cast({node_removed, Node, Cookie}, State) ->
-    {noreply, remove_node(Node, Cookie, State)};
+% handle_cast({node_connected, Node, Cookie}, State) ->
+%     {noreply, add_node(Node, Cookie, State)};
+% handle_cast({node_disconnected, Node, Cookie}, State) ->
+%     {noreply, remove_node(Node, Cookie, State)};
+% handle_cast({node_removed, Node, Cookie}, State) ->
+%     {noreply, remove_node(Node, Cookie, State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 %% --------------------------------------------------------------------------
@@ -237,25 +249,25 @@ start_remote_code(Node,_Cookie) ->
                                         ok | {error, Reason :: term()}.
 inject_module(ModName, NodeName) ->
     io:format("Inject the agent code into the node (NodeName=~p, "
-               "Agent=~p)", [NodeName, ModName]),
+               "Agent=~p)~n", [NodeName, ModName]),
     case code:get_object_code(ModName) of
         {ModName, Bin, File} ->
             case rpc:call(NodeName, code, load_binary,
                           [ModName, File, Bin]) of
                 {module, ModName} ->
                     purge_module(NodeName, ModName), % remove old code of module code
-                    io:format("Agent injected (NodeName=~p, Agent=~p)",
+                    io:format("Agent injected (NodeName=~p, Agent=~p)~n",
                                [NodeName, ModName]),
                     ok;
                 {Error, Reason} when Error =:= error;
                                      Error =:= badrpc ->
                     io:format("rpc(~p, code, load_binary, ...) "
-                                "failed (ModName=~p, Reason=~p)",
+                                "failed (ModName=~p, Reason=~p)~n",
                                 [NodeName, ModName, Reason]),
                     {error, {load_binary_failed, Reason}}
             end;
         error ->
-            io:format("code:get_object_code failed (ModName=~p)",
+            io:format("code:get_object_code failed (ModName=~p)~n",
                         [ModName]),
             {error, {get_object_code_failed, ModName}}
     end.
@@ -274,16 +286,16 @@ inject_module(ModName, NodeName) ->
           end,
     case Res of
         ok ->
-            io:format("Purged ~p from ~p", [Module, Node]);
+            io:format("Purged ~p from ~p~n", [Module, Node]);
         {error, Error} ->
-            io:format("Error while purging  ~p from ~p: ~p", [Module, Node, Error])
+            io:format("Error while purging  ~p from ~p: ~p~n", [Module, Node, Error])
     end,
     ok.
 
 hard_purge_module(Node, Module) ->
     try rpc:call(Node, code, purge, [Module]) of
         true ->
-            io:format("Purging killed processes on ~p while loading ~p", [Node, Module]),
+            io:format("Purging killed processes on ~p while loading ~p~n", [Node, Module]),
             ok;
         false ->
             io:format("Could not code:purge ~p~n", [Module]);

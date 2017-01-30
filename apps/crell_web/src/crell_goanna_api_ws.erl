@@ -11,7 +11,7 @@
 
 
 init(Req, Opts) ->
-    erlang:register(crell_goanna_api_ws, self()),
+    % erlang:register(crell_goanna_api_ws, self()),
     process_flag(trap_exit, true),
     % io:format("Opts : ~p~n", [Opts]),
     {cowboy_websocket, Req, #?STATE{}}.
@@ -64,7 +64,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
          {<<"function">>,<<"add_node">>},
          {<<"args">>,[Node, Cookie, Type]}] ->
             %% TODO: how will i handle errors?
-             {ok, _GoannaNodePid} = 
+             {ok, _GoannaNodePid} =
                   goanna_api:add_node(list_to_atom(binary_to_list(Node)),
                                       list_to_atom(binary_to_list(Cookie)),
                                       list_to_atom(binary_to_list(Type))
@@ -113,7 +113,7 @@ websocket_info({timeout, _Ref, {<<"fetch">>, Count}}, Req, #?STATE{ polling = fa
     {reply, {text, Json}, Req, State};
 websocket_info({timeout, _Ref, {<<"fetch">>, Count}}, Req, #?STATE{ polling = true } = State) ->
     NewCount = Count - 1,
-    Json = 
+    Json =
         case NewCount of
             0 ->
                 polling_end_json();

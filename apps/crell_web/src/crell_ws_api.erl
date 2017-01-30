@@ -8,7 +8,10 @@
 -record(?STATE, { }).
 
 init(Req, _Opts) ->
-    erlang:register(crell_goanna_api_ws, self()),
+
+    true = crell_notify:subscribe({node_events}),
+
+    % erlang:register(crell_ws_api, self()),
     process_flag(trap_exit, true),
     % io:format("Opts : ~p~n", [Opts]),
     % erlang:send_after(1000, self(), bla),
@@ -31,9 +34,14 @@ websocket_handle({text, ReqJson}, Req, State) ->
          {<<"args">>,[Node, Cookie]}] ->
             ok = crell_server:add_node(crell_web_utils:ens_atom(Node),
                                        crell_web_utils:ens_atom(Cookie)),
-            NodesJson = nodes_json(),
-            erlang:send_after(250, self(), nodes),
-            {reply, {text, NodesJson}, Req, State};
+            {reply, reply_ok(), Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"del_node">>},
+         {<<"args">>,[Node]}] ->
+            ok = crell_server:remove_node(
+                crell_web_utils:ens_atom(Node)
+            ),
+            {reply, reply_ok(), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"non_sys_processes">>},
          {<<"args">>,[Node]}] ->
@@ -41,15 +49,6 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 crell_web_utils:ens_atom(Node))
             ),
             {reply, {text, PidsJson}, Req, State};
-        [{<<"module">>,<<"crell_server">>},
-         {<<"function">>,<<"del_node">>},
-         {<<"args">>,[Node]}] ->
-            ok = crell_server:remove_node(
-                crell_web_utils:ens_atom(Node)
-            ),
-            NodesJson = nodes_json(),
-            erlang:send_after(250, self(), nodes),
-            {reply, {text, NodesJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"runtime_modules">>},
          {<<"args">>,[Node]}] ->
@@ -64,9 +63,25 @@ websocket_handle({text, ReqJson}, Req, State) ->
             {reply, {text, Json}, Req, State}
     end.
 
-websocket_info(nodes, Req, State) ->
-    NodesJson = nodes_json(),
-    {reply, {text, NodesJson}, Req, State};
+reply_ok() ->
+    {text, jsx:encode([{<<"reply">>, <<"ok">>}])}.
+
+% websocket_info(nodes, Req, State) ->
+%     io:format("Websocket info nodes\n"),
+%     NodesJson = nodes_json(),
+%     {reply, {text, NodesJson}, Req, State};
+websocket_info({crell_notify,
+                {node_events},
+                {node_connecting,Node}}, Req, State) ->
+    {reply, {text, jsx:encode([{<<"node_connecting">>,
+                                crell_web_utils:ens_bin(Node)}])}, Req, State};
+websocket_info({crell_notify,
+                {node_events},
+                {Event,Node,_Cookie}
+               }, Req, State) when Event == node_connected;
+                                   Event == node_disconnected ->
+    {reply, {text, jsx:encode([{crell_web_utils:ens_bin(Event),
+                                crell_web_utils:ens_bin(Node)}])}, Req, State};
 websocket_info(Info, Req, State) ->
     io:format("Info : ~p\n", [Info]),
     Json = <<"reply">>,

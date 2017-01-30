@@ -36,11 +36,23 @@
             } else {
                 $('#nodes_info_label').html('');
             }
+        } else if(json_data.hasOwnProperty('node_connecting')) {
+            $('#loaderImg').attr("class", "visible");
+        } else if(json_data.hasOwnProperty('node_connected')) {
+            $('#loaderImg').attr("class", "invisible");
+            var node = json_data.node_connected;
+            $('#nodes').append('<option value='+node+' >'+node+'</option>');
+            $('#nodes_info_label').html('');
+        } else if(json_data.hasOwnProperty('node_disconnected')) {
+            var node = json_data.node_disconnected;
+            $("#nodes option[value='"+node+"']").remove();
+            if( $('#nodes').has('option').length == 0 ) {
+                $('#nodes_info_label').html('No nodes added. Add a node on this page.');
+            }
         }
     }
 
     $('#save_node').click(function(){
-        //alert('save');
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'add_node',
                                 'args':
