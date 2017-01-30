@@ -26,15 +26,19 @@
     function handle_message(msg) {
         var json_data = JSON.parse(msg.data);
         if(json_data.hasOwnProperty('nodes')) {
-            $('#nodes').empty();
-            for(var n in json_data.nodes){
-                var node = json_data.nodes[n];
-                $('#nodes').append('<option value='+node+' >'+node+'</option>');
-            }
-            if(json_data.nodes.length>0){
-                get_application(json_data.nodes[0]);
-            }else{
-                  alert('no nodes added');
+            if(json_data.nodes.length == 0){
+                alert('First add a node.');
+                window.location.href = 'index.html'
+            } else {
+                $('#nodes').empty();
+                for(var n in json_data.nodes){
+                    var node = json_data.nodes[n];
+                    $('#nodes').append('<option value='+node+' >'+node+'</option>');
+                }
+                // get the first Node's apps'
+                if(json_data.nodes.length>0){
+                    get_application(json_data.nodes[0]);
+                }
             }
         } else if (json_data.hasOwnProperty('node_apps')) {
             $('#apps_table').empty();

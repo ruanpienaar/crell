@@ -222,7 +222,7 @@ start_remote_code(Node,Cookie) ->
 -spec inject_module(ModName :: term(), NodeName :: atom()) ->
                                         ok | {error, Reason :: term()}.
 inject_module(ModName, NodeName) ->
-    lager:info("Inject the agent code into the node (NodeName=~p, "
+    io:format("Inject the agent code into the node (NodeName=~p, "
                "Agent=~p)", [NodeName, ModName]),
     case code:get_object_code(ModName) of
         {ModName, Bin, File} ->
@@ -230,18 +230,18 @@ inject_module(ModName, NodeName) ->
                           [ModName, File, Bin]) of
                 {module, ModName} ->
                     purge_module(NodeName, ModName), % remove old code of module code
-                    lager:info("Agent injected (NodeName=~p, Agent=~p)",
+                    io:format("Agent injected (NodeName=~p, Agent=~p)",
                                [NodeName, ModName]),
                     ok;
                 {Error, Reason} when Error =:= error;
                                      Error =:= badrpc ->
-                    lager:error("rpc(~p, code, load_binary, ...) "
+                    io:format("rpc(~p, code, load_binary, ...) "
                                 "failed (ModName=~p, Reason=~p)",
                                 [NodeName, ModName, Reason]),
                     {error, {load_binary_failed, Reason}}
             end;
         error ->
-            lager:error("code:get_object_code failed (ModName=~p)",
+            io:format("code:get_object_code failed (ModName=~p)",
                         [ModName]),
             {error, {get_object_code_failed, ModName}}
     end.
@@ -260,19 +260,19 @@ inject_module(ModName, NodeName) ->
           end,
     case Res of
         ok ->
-            lager:info("Purged ~p from ~p", [Module, Node]);
+            io:format("Purged ~p from ~p", [Module, Node]);
         {error, Error} ->
-            lager:error("Error while purging  ~p from ~p: ~p", [Module, Node, Error])
+            io:format("Error while purging  ~p from ~p: ~p", [Module, Node, Error])
     end,
     ok.
 
 hard_purge_module(Node, Module) ->
     try rpc:call(Node, code, purge, [Module]) of
         true ->
-            lager:info("Purging killed processes on ~p while loading ~p", [Node, Module]),
+            io:format("Purging killed processes on ~p while loading ~p", [Node, Module]),
             ok;
         false ->
-            lager:warning("Could not code:purge ~p~n", [Module]);
+            io:format("Could not code:purge ~p~n", [Module]);
         {badrpc, _} = RPCError ->
             {error, RPCError}
     catch

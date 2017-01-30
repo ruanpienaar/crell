@@ -8,7 +8,6 @@
      % {builtins, true} ,{recurse, true},
      {verbose, true},{warnings, true}
 ]).
--compile([{parse_transform, lager_transform}]).
 
 run(Module) ->
     ok = initialize_xref(?XSRV),
@@ -115,12 +114,12 @@ add_ebin(EbinPath) ->
             {ok,_Modules} ->
                 ok;
             {error, xref_base, Reason} ->
-                lager:error("~p got ~p",[?MODULE, {error, xref_base, Reason}])
+                io:format("~p got ~p",[?MODULE, {error, xref_base, Reason}])
         end
     catch
         C:E ->
             ST = erlang:get_stacktrace(),
-            lager:error("~p got ~p, ~p\n~p\n",[?MODULE, C, E, ST])
+            io:format("~p got ~p, ~p\n~p\n",[?MODULE, C, E, ST])
     end.
 
 module_edges(XServ, Module) ->
@@ -130,9 +129,9 @@ module_edges(XServ, Module) ->
     catch
         C:E ->
             ST = erlang:get_stacktrace(),
-            lager:error("~p got ~p, ~p\n~p\n",[?MODULE,C,E,ST]),
+            io:format("~p got ~p, ~p\n~p\n",[?MODULE,C,E,ST]),
             {error,[{c,C},{e,E},{stacktrace,ST}]}
     end.
 
 error() ->
-	lager:error("Test").
+	io:format("Test").

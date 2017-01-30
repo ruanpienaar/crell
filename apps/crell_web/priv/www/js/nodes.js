@@ -31,6 +31,9 @@
                 var node = json_data.nodes[n];
                 $('#nodes').append('<option value='+node+' >'+node+'</option>');
             }
+            if(json_data.nodes.length==0){
+                $('#nodes_info_label').html('No nodes added. Add a node on this page.');
+            }
         }
     }
 
@@ -43,6 +46,8 @@
                                      $('#cookie').val()]
                                })
         );
+        $('#node').empty();
+        $('#cookie').empty();
     });
 
   });

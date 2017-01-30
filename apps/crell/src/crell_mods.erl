@@ -4,7 +4,7 @@
     find/1,
     module_edges/2,
 
-    %% Xref: 
+    %% Xref:
     initialize_xref/2,
     add_dir_xref/2
 ]).
@@ -13,13 +13,13 @@
      % ,{recurse, true},{verbose, true},{warnings, true}
 ]).
 
--spec all() -> 
+-spec all() ->
     [{Module :: module(), AbsolutePath :: string()}].
 all() ->
     %% Maybe cache all the modules....
     _Loaded = code:all_loaded().
 
--spec find(Module :: module()) -> 
+-spec find(Module :: module()) ->
     {Module :: module(), AbsolutePath :: string()}.
 find(Module) ->
     code:is_loaded(Module).
@@ -31,7 +31,7 @@ module_edges(XServ, Module) ->
     catch
         C:E ->
             ST = erlang:get_stacktrace(),
-            lager:error("~p got ~p, ~p\n~p\n",[C,E,ST]),
+            io:format("~p got ~p, ~p\n~p\n",[C,E,ST]),
             {error,[{c,C},{e,E},{stacktrace,ST}]}
     end.
 
@@ -56,12 +56,12 @@ stop_xref(Ref) ->
 ok({ok, Result}) -> Result;
 ok(Error)        -> throw(Error).
 
--spec add_all_ebins(any()) -> 
+-spec add_all_ebins(any()) ->
     [{Dir :: string(), [atom()] }].
 add_all_ebins(XServ) ->
-    lists:foldl(fun({Mod,preloaded}, Acc) -> 
+    lists:foldl(fun({Mod,preloaded}, Acc) ->
                         Acc;
-                      ({Mod, ModAbsPath}, Acc) -> 
+                      ({Mod, ModAbsPath}, Acc) ->
                         EbinPath = beam_dir(ModAbsPath, Mod),
                         Mods = add_dir_xref(XServ, EbinPath),
                         [{EbinPath, Mods} | Acc]

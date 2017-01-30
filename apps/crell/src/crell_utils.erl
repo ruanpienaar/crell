@@ -6,7 +6,7 @@
 ]).
 
 test_1() ->
-   	lager:info("Test").
+   	io:format("Test").
 
 test_2() ->
     test_3().

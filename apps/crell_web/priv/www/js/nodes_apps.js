@@ -26,6 +26,10 @@
     function handle_message(msg) {
         var json_data = JSON.parse(msg.data);
         if(json_data.hasOwnProperty('nodes')) {
+            if(json_data.nodes.length == 0){
+                alert('First add a node.');
+                window.location.href = 'index.html'
+            }
             $('#nodes').empty();
             for(var n in json_data.nodes){
                 var node = json_data.nodes[n];
@@ -33,8 +37,6 @@
             }
             if(json_data.nodes.length>0){
                 get_applications(json_data.nodes[0]);
-            }else{
-                  alert('no nodes added');
             }
         } else if (json_data.hasOwnProperty('node_apps')) {
             if ( $( "#apps_table" ).length ) {
