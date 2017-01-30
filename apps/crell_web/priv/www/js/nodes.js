@@ -33,6 +33,8 @@
             }
             if(json_data.nodes.length==0){
                 $('#nodes_info_label').html('No nodes added. Add a node on this page.');
+            } else {
+                $('#nodes_info_label').html('');
             }
         }
     }
@@ -46,8 +48,23 @@
                                      $('#cookie').val()]
                                })
         );
-        $('#node').empty();
-        $('#cookie').empty();
+        $('#node').val("");
+        $('#cookie').val("");
+    });
+
+    $('#del_node').click(function(){
+        if ( confirm("Remove node "+$('#nodes').val()+" ?") ){
+            ws.send(JSON.stringify({'module':'crell_server',
+                                    'function':'del_node',
+                                    'args':
+                                        [$('#nodes').val()]
+                                   })
+            );
+        }
+    });
+
+    $('#edit_node').click(function(){
+        alert('Not implemented yet.');
     });
 
   });

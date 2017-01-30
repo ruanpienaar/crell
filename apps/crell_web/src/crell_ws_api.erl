@@ -32,8 +32,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
             ok = crell_server:add_node(crell_web_utils:ens_atom(Node),
                                        crell_web_utils:ens_atom(Cookie)),
             NodesJson = nodes_json(),
-            %% This is to refresh the nodes...
-            erlang:send_after(5000, self(), nodes),
+            erlang:send_after(250, self(), nodes),
             {reply, {text, NodesJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"non_sys_processes">>},
@@ -42,6 +41,23 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 crell_web_utils:ens_atom(Node))
             ),
             {reply, {text, PidsJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"del_node">>},
+         {<<"args">>,[Node]}] ->
+            ok = crell_server:remove_node(
+                crell_web_utils:ens_atom(Node)
+            ),
+            NodesJson = nodes_json(),
+            erlang:send_after(250, self(), nodes),
+            {reply, {text, NodesJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"runtime_modules">>},
+         {<<"args">>,[Node]}] ->
+            Mods = crell_server:runtime_modules(
+                crell_web_utils:ens_atom(Node)
+            ),
+            ModsJson = mods_json(Mods, []),
+            {reply, {text, ModsJson}, Req, State};
         UnknownJson ->
             io:format("UnknownJson: ~p~n", [UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
@@ -89,3 +105,8 @@ proc_lib_names({M,F,Arity}) ->
     crell_web_utils:ens_bin(io_lib:format("~p:~p/~p",[M,F,Arity]));
 proc_lib_names(Name) when is_atom(Name) ->
     crell_web_utils:ens_bin(atom_to_list(Name)).
+
+mods_json([], R) ->
+    jsx:encode([{<<"mods">>, lists:reverse(R)}]);
+mods_json([H|T] , R) ->
+    mods_json(T, [list_to_binary(atom_to_list(H))|R]).

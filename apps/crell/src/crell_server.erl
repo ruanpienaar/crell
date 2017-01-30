@@ -12,7 +12,7 @@
 -export([
     start_link/0,
     add_node/2,
-    remove_node/2,
+    remove_node/1,
     nodes/0,
     runtime_modules/1,
     runtime_module_functions/2,
@@ -55,12 +55,14 @@ add_node(Node, Cookie) ->
             ok
     end.
 
-remove_node(Node, Cookie) ->
+remove_node(Node) ->
     ok = purge_module(Node, crell_remote),
     ok = hawk:remove_node(Node).
 
 nodes() ->
     gen_server:call(?MODULE, nodes).
+
+%% Maybe we should bundle modules per application ?
 
 runtime_modules(Node) ->
     gen_server:call(?MODULE, {runtime_modules, Node}).
@@ -109,11 +111,11 @@ node_ordict_values(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
     end.
 
 %% TODO: rather make explicit remote update calls, update_remote_modules
-do_get_values(Node, RemoteState, get_remote_modules) ->
+do_get_values(_Node, RemoteState, get_remote_modules) ->
     RemoteModules = dict:fetch(remote_modules, RemoteState),
     Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, RemoteModules)),
     {ok, Mods, RemoteState};
-do_get_values(Node, RemoteState, {get_remote_module_functions, Mod}) ->
+do_get_values(_Node, RemoteState, {get_remote_module_functions, Mod}) ->
     RemoteModules = dict:fetch(remote_modules, RemoteState),
     case lists:keyfind(Mod, 1, RemoteModules) of
         false ->
@@ -126,40 +128,55 @@ do_get_values(Node, RemoteState, non_sys_processes) ->
     ProcList = rpc:call(Node, crell_remote, non_sys_processes, []),
     {ok, ProcList, RemoteState};
 do_get_values(Node, RemoteState, {app_env, AppName}) ->
-    RemoteAllEnv = dict:fetch(remote_all_env, RemoteState),
-    case lists:keyfind(AppName, 1, RemoteAllEnv) of
+    RemoteState2 = rpc:call(Node, crell_remote, remote_all_env, [RemoteState]),
+    RemoteApps = dict:fetch(remote_all_env, RemoteState2),
+    case lists:keyfind(AppName, 1, RemoteApps) of
         false ->
-            {ok, false, RemoteState};
-        {App, AppEnv} ->
-            {ok, AppEnv, RemoteState}
+            {ok, false, RemoteState2};
+        {AppName, AppEnv} ->
+            {ok, AppEnv, RemoteState2}
     end;
 do_get_values(Node, RemoteState, remote_which_applications) ->
-    RemoteApps = dict:fetch(remote_running_applications, RemoteState),
-    {ok, RemoteApps, RemoteState}.
+    RemoteState2 = rpc:call(Node, crell_remote, remote_applications, [RemoteState]),
+    RemoteApps = dict:fetch(remote_running_applications, RemoteState2),
+    {ok, RemoteApps, RemoteState2}.
 
 handle_call(nodes, _From, State) ->
     Nodes = orddict:fetch_keys(State#?STATE.nodes),
     {reply, Nodes, State};
 handle_call({runtime_modules, Node}, _From, State) ->
+    % Update state here
     {ok, Reply, NewState} = node_ordict_values(Node, State, get_remote_modules),
     {reply, Reply, NewState};
 handle_call({runtime_module_functions, Node, Mod}, _From, State) ->
+    % Update state here
     {ok, Reply, _} = node_ordict_values(Node, State, {get_remote_module_functions, Mod}),
     {reply, Reply, State};
 handle_call({non_sys_processes, Node}, _From, State) ->
+    % Update state here
     {ok, Reply, _} = node_ordict_values(Node, State, non_sys_processes),
     {reply, Reply, State};
 handle_call({app, Node, App, Opts}, _From, State) ->
+    % Update state here
     R = rpc:call(Node,crell_remote,calc_app_tree,[App, Opts]),
     {reply, R, State};
 handle_call({app_env, Node, AppName}, _From, State) ->
+    % Update state here
     {ok, Reply, NewState} = node_ordict_values(Node, State, {app_env, AppName}),
     {reply, Reply, NewState};
 handle_call({pid, Node, Pid}, _From, State) ->
+    % Update state here
     R = rpc:call(Node,crell_remote,calc_proc_tree,[Pid, []]),
     {reply, R, State};
     %% TODO: also build a all app env....
 handle_call({remote_which_applications, Node}, _From, State) ->
+    % Update state here
+
+    % {ok, RemoteState} = start_remote_code(Node, Cookie),
+    % State#?STATE{ nodes = orddict:store(Node, RemoteState, N) }.
+
+    %{ok, RemoteState} = remote_state(),
+
     {ok, Reply, _} = node_ordict_values(Node, State, remote_which_applications),
     {reply, Reply, State};
 handle_call(Request, _From, State) ->
@@ -195,15 +212,13 @@ add_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
 remove_node(Node, _Cookie, #?STATE{ nodes = N } = State) ->
     State#?STATE{ nodes = orddict:erase(Node, N) }.
 
-start_remote_code(Node,Cookie) ->
+start_remote_code(Node,_Cookie) ->
     case application:get_env(crell, remote_action) of
         {ok, 1} ->
             % try loading module
             case inject_module(crell_remote, Node) of
-                ok ->
-                    {ok, _RemoteState} = rpc:call(Node, crell_remote, init, []);
-                _ ->
-                    {stop, enotloaded}
+                ok -> {ok, _RemoteState} = rpc:call(Node, crell_remote, init, []);
+                _  -> {stop, enotloaded}
             end;
         {ok, 2} ->
             % TODO: try lib, and call remote state
@@ -217,7 +232,6 @@ start_remote_code(Node,Cookie) ->
         undefined ->
             {ok, todo_get_remote_state}
     end.
-
 
 -spec inject_module(ModName :: term(), NodeName :: atom()) ->
                                         ok | {error, Reason :: term()}.

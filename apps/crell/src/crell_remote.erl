@@ -2,35 +2,50 @@
 -record(db, {q, p, links, links2}).
 -export([
     init/0,
-    state/0,
-    get_remote_modules/0,
+    remote_appmon_pid/1,
+    remote_modules/1,
+    remote_applications/1,
+    remote_all_env/1,
     calc_app_tree/2,
     calc_proc_tree/2,
     non_sys_processes/0,
     get_app_env/0
 ]).
 %%----------------------------------------------------------------------
-%% TODO: maybe poll and updated the state on the remote node.
 
-%% TODO: check the type proplist here....
--spec init() -> {ok, gb_sets:set()}.
+-spec init() -> {ok, dict:dict()}.
 init() ->
-    state().
+    init(dict:new()).
 
-state() ->
-    state(dict:new()).
-
-state(Dict) ->
-    {ok, Pid} = start_appmon(),
+init(Dict) ->
     RRAs = running_apps(),
-    Dict1 = dict:store(remote_appmon_pid, Pid, Dict),
-    Dict2 = dict:store(remote_modules, get_remote_modules(), Dict1),
-    Dict3 = dict:store(remote_running_applications, RRAs, Dict2),
-    Dict4 = dict:store(remote_all_env, get_app_env(RRAs), Dict3),
+    Dict1 = remote_appmon_pid(Dict),
+    Dict2 = remote_modules(Dict1),
+    Dict3 = remote_applications(Dict2, RRAs),
+    Dict4 = remote_all_env(Dict3, RRAs),
     {ok, Dict4}.
+
+remote_appmon_pid(Dict) ->
+    {ok,Pid} = start_appmon(),
+    dict:store(remote_appmon_pid, Pid, Dict).
+
+remote_modules(Dict) ->
+    dict:store(remote_modules, get_remote_modules(), Dict).
 
 get_remote_modules() ->
     [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
+
+remote_applications(Dict) ->
+    dict:store(remote_running_applications, running_apps(), Dict).
+
+remote_applications(Dict, RRAs) ->
+    dict:store(remote_running_applications, RRAs, Dict).
+
+remote_all_env(Dict) ->
+    dict:store(remote_all_env, get_app_env(running_apps()), Dict).
+
+remote_all_env(Dict,RRAs) ->
+    dict:store(remote_all_env, get_app_env(RRAs), Dict).
 
 start_appmon() ->
     %% Check erlang versions here...

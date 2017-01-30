@@ -13,8 +13,7 @@ start_link() ->
 start() ->
     {ok,Port} = port(),
     io:format("......\nStarting cowboy on ~p\n......\n",[Port]),
-    Routes    = routes(),
-    Dispatch  = cowboy_router:compile(Routes),
+    Dispatch  = cowboy_router:compile( routes() ),
     {ok, Pid} = cowboy:start_http(?COWBOY_REF,
                                 _ConnectionPoolSize=10,
                                 [{port, Port}],
@@ -31,9 +30,9 @@ routes() ->
     [
      {'_',
         [
-            {"/",cowboy_static, {priv_file, crell, "www/index.html"}},
+            {"/",cowboy_static, {priv_file, crell_web, "www/index.html"}},
 
-                {"/crell_proc/app/:app_name/node/:node", crell_proc, []},
+            {"/crell_proc/app/:app_name/node/:node", crell_proc, []},
 
             {"/crell_proc/apps", crell_apps, []},
             {"/crell_proc/pid/:pid", crell_pid, []},

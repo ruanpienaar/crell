@@ -63,40 +63,62 @@
         );
     }
 
-    // var all_procs = $http.get("/crell_proc/pids/");
-    // all_procs.success(function(data, status, headers, config) {
-    //     $scope.pid_data = data;
-    // });
-
-    // all_procs.error(function(data, status, headers, config) {
-    //     alert("pid_data rest call failed!");
-    // });
-
-    // $scope.trace_module = function(module){
-    //     // var response = $http.get("/crell_mod/trace/" + module);
-    //     // response.success(function(data, status, headers, config) {
-    //     //     // here, do something with data..........
-    //     //     // show the trace screen.......
-    //     // });
-    //     // response.error(function(data, status, headers, config) {
-    //     //    alert("rest call failed!");
-    //     // });
-    // }
+    $('#nodes').change(function(){
+        get_pids($('#nodes').val());
+    });
 
   });
 
 })();
 
 
-// {name: "init", children: [
-        // {name: "erl_prim_loader", children: [
-                //{name: "port 0", children: []}]}]}
+    // function github_search_link(init_call){
+    //     return '<a onclick=\"new_github_tab(\''+init_call+'\')\">'+init_call+'</a>';
+    // }
 
+    // function new_github_tab(init_call){
+    //     var module = module_from_init_call(init_call);
+    //     var API_url = github_api_erlang_search_query(module);
+    //     var url = github_module_url(API_url, module);
+    //     var win = window.open(url, '_blank');
+    //     if (win) {
+    //         //Browser has allowed it to be opened
+    //         win.focus();
+    //     } else {
+    //         //Browser has blocked it
+    //         alert('Please allow popups for this website');
+    //     }
+    // }
 
-// {"name":"user","children":[{"name":"user_drv","children":[
-        /// {"name":"<0.32.0>","children":[]},
-        /// {"name":"port 2944","children":[]}]}]}
+    // function module_from_init_call(init_call){
+    //     if(init_call.includes(':') && init_call.includes('/')){
+    //         var tokens = init_call.split(":");
+    //         return tokens[0];
+    //     } else {
+    //         return init_call;
+    //     }
+    // }
 
-// {"name":"<0.39.0>","children":[
-        // {"name":"<0.33.0>","children":[
-            // {"name":"<0.65.0>","children":[]}]}]}
+    // function github_api_erlang_search_query(module){
+    //     // https://api.github.com/search/code?q=-module%28application%29.filename:application.erl+in:file+language:Erlang+repo:erlang/otp
+    //     var g_url = 'https://api.github.com/search/code?q=';
+    //     g_url += '?q=-module%28'+module+'%28.'
+    //     g_url += 'filename:'+module+'.erl+in:file+language:Erlang+repo:erlang/otp'
+    //     return g_url;
+    // }
+
+    // function github_module_url(API_url, module){
+    //     var resp = '#';
+    //     var full_mod = module+".erl";
+    //     $.getJSON( API_url, {
+    //     format: "json"
+    //     })
+    //     .done(function( data ) {
+    //       $.each( data.items, function( i, item ) {
+    //         if( item.name == full_mod ){
+    //             resp = item.html_url;
+    //             return resp;
+    //         }
+    //       });
+    //     });
+    // }

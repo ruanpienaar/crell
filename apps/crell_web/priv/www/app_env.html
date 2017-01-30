@@ -1,86 +1,80 @@
 <!DOCTYPE html>
 <html lang="en" ng-app="CrellApp">
-<head>
-	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
-	<meta name="description" content="">
-	<meta name="author" content="Ruan pienaar">
-	<link rel="icon" href="favicon.ico">
-	<title>Application Env</title>
-	<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
-	<!-- Custom styles for this template -->
-	<link href="justified-nav.css" rel="stylesheet">
-	<script type="text/javascript" src="angular-1.3.9/angular.min.js">
-	</script>
-	<script type="text/javascript" src="js/app_env.js">
-    </script>
+    <head>
+    	<meta charset="utf-8">
+    	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+    	<meta name="viewport" content="width=device-width, initial-scale=1">
+    	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    	<meta name="description" content="">
+    	<meta name="author" content="Ruan pienaar">
+    	<link rel="icon" href="favicon.ico">
+    	<title>Application Env</title>
+    	<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+        <link href="justified-nav.css" rel="stylesheet">
+    	<script type="text/javascript" src="angular-1.3.9/angular.min.js"></script>
+    	<script type="text/javascript" src="js/app_env.js"></script>
+    	<!-- <link rel="stylesheet" href="highlight/styles/default.css">
+    	<script src="highlight/highlight.pack.js"></script> -->
+    	<!--<script>hljs.initHighlightingOnLoad();</script>-->
+    </head>
+    <body ng-controller="CrellController as ctrl">
+        <div class="container-fluid">
+          <!-- The justified navigation menu is meant for single line per list item.
+               Multiple lines will require custom code not provided by Bootstrap. -->
+          <div class="masthead">
+            <nav>
+              <ul class="nav nav-justified">
+                <li><a href="index.html">Nodes</a></li>
+                <li><a href="application.html">Applications</a></li>
+                <li><a href="processes.html">Processes</a></li>
+                <li><a href="sup_tree.html">Sup Tree</a></li>
+                <li class="active"><a href="app_env.html">App Env</a></li>
+                <li><a href="modules.html">modules</a></li>
+                <li><a href="traces.html">Traces</a></li>
+              </ul>
+            </nav>
+          </div>
+          <div class="jumbotron">
+            <h2>Application Env</h2>
+            <form>
+                <select id="otp_app" onchange="draw()">
+                    <option ng-repeat="app in app_data" value="{{app.application_name}}">
+                    {{app.application_name}}
+                    </option>
+                </select>
+                <button onclick="draw();" type="button">Update</button>
+            </form>
+         </div>
 
-	<link rel="stylesheet" href="highlight/styles/default.css">
-	<script src="highlight/highlight.pack.js"></script>
-	<!--<script>hljs.initHighlightingOnLoad();</script>-->
+         <div class="container" id="appenv">
 
-</head>
-<body ng-controller="CrellController as ctrl">
-    <div class="container-fluid">
-      <!-- The justified navigation menu is meant for single line per list item.
-           Multiple lines will require custom code not provided by Bootstrap. -->
-      <div class="masthead">
-        <nav>
-          <ul class="nav nav-justified">
-            <li><a href="index.html">Nodes</a></li>
-            <li><a href="application.html">Applications</a></li>
-            <li><a href="processes.html">Processes</a></li>
-            <li><a href="sup_tree.html">Sup Tree</a></li>
-            <li><a href="code_tree.html">Code Browser</a></li>
-            <li class="active"><a href="app_env.html">App Env</a></li>
-            <li><a href="modules.html">modules</a></li>
-            <li><a href="traces.html">Traces</a></li>
-          </ul>
-        </nav>
-      </div>
-      <div class="jumbotron">
-        <h2>Application Env</h2>
-        <form>
-            <select id="otp_app" onchange="draw()">
-                <option ng-repeat="app in app_data" value="{{app.application_name}}">
-                {{app.application_name}}
-                </option>
-            </select>
-            <button onclick="draw();" type="button">Update</button>
-        </form>
-     </div>
+         </div>
 
-     <div class="container" id="appenv">
-
-     </div>
-
-     <script type="text/javascript" src="js/jquery-1.11.2.min.js"></script>
-     <script type="text/javascript">
-     	function draw(){
-	        var name = $('#otp_app').val();
-	        $.get( "/crell_app_env/"+name)
-	            .done(function( data ){
-                $('#appenv').html(
-                    '<pre><code class="erlang" >'+data+'</code></pre>'
-                );
-	              $('pre code').each(function(i, block) {
-                  hljs.configure({
-                    tabReplace: '    '// 4 spaces
-                  })
-                  hljs.initHighlighting();
-	                hljs.highlightBlock(block);
-	              });
-	            })
-	            .fail(function() {
-	              //alert( "error" );
-	            })
-	            .always(function() {
-	              //alert( "finished" );
-	            });
-     	}
-     </script>
-   </div>
-</body>
+         <script type="text/javascript" src="js/jquery-1.11.2.min.js"></script>
+         <script type="text/javascript">
+         	function draw(){
+    	        var name = $('#otp_app').val();
+    	        $.get( "/crell_app_env/"+name)
+    	            .done(function( data ){
+                    $('#appenv').html(
+                        '<pre><code class="erlang" >'+data+'</code></pre>'
+                    );
+    	              $('pre code').each(function(i, block) {
+                      hljs.configure({
+                        tabReplace: '    '// 4 spaces
+                      })
+                      hljs.initHighlighting();
+    	                hljs.highlightBlock(block);
+    	              });
+    	            })
+    	            .fail(function() {
+    	              //alert( "error" );
+    	            })
+    	            .always(function() {
+    	              //alert( "finished" );
+    	            });
+         	}
+         </script>
+       </div>
+    </body>
 </html>

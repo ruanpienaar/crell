@@ -47,7 +47,8 @@
                 $('#apps_table').append('<tr><td>'+
                     napp.name+'</td><td>'+
                     napp.erts_vsn+'</td><td>'+
-                    napp.vsn+'</td></tr>');
+                    napp.vsn+'</td><td>'+
+                    '<button>Get App Env</button></td></tr>');
             }
         }
     }

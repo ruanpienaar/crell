@@ -1,41 +1,64 @@
-
 (function(){
-  var app = angular.module('CrellApp', []);
-  app.controller('CrellController', function($scope, $http){
-    // first run
-    $scope.mods = {};
-    $scope.mod_traced = 'test';
-    var all_mods = $http.get("/crell_mod/all");
-    all_mods.success(function(data, status, headers, config) {
-        $scope.mods = data;
-    });
-    all_mods.error(function(data, status, headers, config) {
-        alert("rest call failed!");
-    });
+    var app = angular.module('CrellApp', []);
+    app.controller('CrellController', function($scope, $http){
 
-    $scope.trace_module = function(module, checked){
-        var restUrl="";
-        
-        alert($scope.mod_traced);
-        $scope.mod_traced = module;
-        
-        if($scope.mod_traced == ''){
-          $scope.mod_traced = module;
-          restUri = "trace/";
-        } else {
-          $scope.mod_traced = '';
-          restUri = "remove_trace/";
-        }
-        
-        var response = $http.get("/crell_mod/" + restUri + module);
-        response.success(function(data, status, headers, config) {
-            // here, do something with data..........
-            // show the trace screen.......
-        });
-        response.error(function(data, status, headers, config) {
-           alert("rest call failed!");
-        });
+    $scope.nodes = {};
+    var url = window.location.href;
+    var arr = url.split("/");
+    var ws_url = "ws://"+arr[2]+"/crell/ws";
+    var ws = new WebSocket(ws_url);
+
+    ws.onopen = function(){
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'nodes',
+                                'args':
+                                    []
+                               })
+        );
     }
+
+    ws.onmessage = function(message){
+        handle_message(message);
+    }
+
+    ws.onclose = function(){
+        alert('closed');
+    }
+
+    function handle_message(msg){
+        var json_data = JSON.parse(msg.data);
+
+        if(json_data.hasOwnProperty('nodes')) {
+            if(json_data.nodes.length == 0){
+                alert('First add a node.');
+                window.location.href = 'index.html'
+            } else {
+                $('#nodes').empty();
+                for(var n in json_data.nodes){
+                    var node = json_data.nodes[n];
+                    $('#nodes').append('<option value='+node+' >'+node+'</option>');
+                }
+                // get the first Node's apps'
+                if(json_data.nodes.length>0){
+                    get_mods(json_data.nodes[0]);
+                }
+            }
+        } else if(json_data.hasOwnProperty('mods')) {
+            for(var n in json_data.mods){
+                $('#mods_table').append('<tr><td>'+
+                    json_data.mods[n]+'</td></tr>');
+            }
+        }
+    }
+
+    function get_mods(node){
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'runtime_modules',
+                                'args':
+                                    [node]
+                               })
+        );
+    };
 
   });
 })();
