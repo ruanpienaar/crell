@@ -57,14 +57,32 @@ websocket_handle({text, ReqJson}, Req, State) ->
             ),
             ModsJson = mods_json(Mods, []),
             {reply, {text, ModsJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"is_tracing">>},
+         {<<"args">>,[]}] ->
+            {reply, reply("is_tracing", crell_server:is_tracing()), Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"toggle_tracing">>},
+         {<<"args">>,[]}] ->
+            {reply, reply("is_tracing", crell_server:toggle_tracing()), Req, State};
         UnknownJson ->
             io:format("UnknownJson: ~p~n", [UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
             {reply, {text, Json}, Req, State}
     end.
 
+% response_reply(Resp, Reply) ->
+%     {text, jsx:encode([
+%             {<<"response">>, crell_web_utils:ens_bin(Resp)}
+%             {<<"reply">>, crell_web_utils:ens_bin(Reply)}
+%     ])}.
+
+reply(Reply, Val) ->
+    {text, jsx:encode([{crell_web_utils:ens_bin(Reply),
+                        crell_web_utils:ens_bin(Val)}])}.
+
 reply_ok() ->
-    {text, jsx:encode([{<<"reply">>, <<"ok">>}])}.
+    reply(reply, ok).
 
 % websocket_info(nodes, Req, State) ->
 %     io:format("Websocket info nodes\n"),

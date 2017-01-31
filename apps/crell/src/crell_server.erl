@@ -6,7 +6,8 @@
 -define(SERVER, ?MODULE).
 -define(STATE, crell_server_state).
 -record(?STATE, {
-    nodes=orddict:new()
+    nodes=orddict:new(),
+    tracing=false
 }).
 
 -export([
@@ -25,6 +26,11 @@
     calc_app_env/2,
     remote_which_applications/1,
     make_xref/1
+]).
+
+-export([
+    is_tracing/0,
+    toggle_tracing/0
 ]).
 
 -export([inject_module/2,
@@ -100,6 +106,16 @@ calc_app_env(Node, AppName) ->
 
 remote_which_applications(Node) ->
    gen_server:call(?MODULE, {remote_which_applications, Node}).
+
+%% This is to follow a function to another....
+make_xref(_Node) ->
+    ok.
+
+is_tracing() ->
+    gen_server:call(?MODULE, is_tracing).
+
+toggle_tracing() ->
+    gen_server:call(?MODULE, toggle_tracing).
 
 %% ---------------------------------------
 
@@ -191,6 +207,15 @@ handle_call(E={node_connected, Node, Cookie}, _From, State) ->
 handle_call(E={node_disconnected, Node, Cookie}, _From, State) ->
     crell_notify:action(E),
     {reply, ok, remove_node(Node, Cookie, State)};
+
+handle_call(is_tracing, _From, State) ->
+    {reply, State#?STATE.tracing, State};
+%% TODO: maybe add some more conditions,
+handle_call(toggle_tracing, _From, #?STATE{tracing=true} = State) ->
+    {reply, false, State#?STATE{ tracing = false }};
+handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
+    {reply, true, State#?STATE{ tracing = true }};
+
 handle_call(Request, _From, State) ->
     {reply, {error, unknown_call, ?MODULE, Request}, State}.
 %% --------------------------------------------------------------------------
@@ -333,7 +358,3 @@ fun_src(Mod, Fun, Arity) ->
 %         catch _:E ->
 %                 {error, E}
 %         end.
-
-%% This is to follow a function to another....
-make_xref(_Node) ->
-    ok.

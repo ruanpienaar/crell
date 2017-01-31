@@ -12,6 +12,7 @@
     gws.onopen = function(){
         //message('onopen : '+socket.readyState+' (open)');
         // gws.send(JSON.stringify({'get':'nodes'}));
+        gws.send(JSON.stringify({'get':'active_traces'}));
     }
 
     gws.onmessage = function(msg){
@@ -77,7 +78,18 @@
     var ws_url = "ws://"+arr[2]+"/crell/ws";
     var ws = new WebSocket(ws_url);
     ws.onopen = function(){
-
+        // ws.send(JSON.stringify({'module':'crell_server',
+        //                         'function':'nodes',
+        //                         'args':
+        //                             []
+        //                        })
+        // );
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'is_tracing',
+                                'args':
+                                    []
+                               })
+        );
     }
 
     ws.onmessage = function(msg){
@@ -92,6 +104,14 @@
                     var node = json_data.nodes[n];
                     $('#nodes').append('<option value='+node+' >'+node+'</option>');
                 }
+            }
+        } else if(json_data.hasOwnProperty('is_tracing')) {
+            if(json_data.is_tracing == 'true'){
+                $('#enable_trc_btn').attr("disabled", true);
+                $('#disable_trc_btn').attr("disabled", false);
+            } else if(json_data.is_tracing == 'false') {
+                $('#enable_trc_btn').attr("disabled", false);
+                $('#disable_trc_btn').attr("disabled", true);
             }
         }
     }
@@ -138,16 +158,16 @@
         }
     });
 
-    $('#addNodeBtn').click(function(){
-        gws.send(JSON.stringify({'module':'goanna_api',
-                                    'function':'add_node',
-                                    'args':
-                                        [$('#add_node').val(),
-                                         $('#add_cookie').val(),
-                                         $('#add_type').val()]
-                                   })
-        );
-    });
+    // $('#addNodeBtn').click(function(){
+    //     gws.send(JSON.stringify({'module':'goanna_api',
+    //                                 'function':'add_node',
+    //                                 'args':
+    //                                     [$('#add_node').val(),
+    //                                      $('#add_cookie').val(),
+    //                                      $('#add_type').val()]
+    //                                })
+    //     );
+    // });
 
     $('#trace_mod').change(function(){
         gws.send(JSON.stringify({'module':'crell_server',
@@ -159,7 +179,6 @@
     });
 
     $('#stopTracePatBtn').click(function(){
-
         gws.send(JSON.stringify({'module':'goanna_api',
                                     'function':'stop_trace',
                                     'args':
@@ -178,12 +197,28 @@
         );
     });
 
+    $('#enable_trc_btn').click(function(){
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'toggle_tracing',
+                                'args':
+                                    []
+                               })
+        );
+    });
+    $('#disable_trc_btn').click(function(){
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'toggle_tracing',
+                                'args':
+                                    []
+                               })
+        );
+    });
+
 // function message(string){
 //     console.log(string);
 // }
 
     function process_trace_obj(obj){
-
         var table_row='';
         switch (obj['type']) {
             case 'trace':

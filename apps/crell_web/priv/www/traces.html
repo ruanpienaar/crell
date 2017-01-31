@@ -38,32 +38,34 @@
             <table class="table table-bordered table-striped">
                 <!-- <caption>Traces</caption> -->
                 <thead>
-                    <tr>
-                        <th colspan="5" class="form-inline" />
+                    <!-- <tr>
+                        <th colspan="5" class="form-inline" /> -->
 
-                            <div>
-                                <label for="add_node">Node</label><input type="text" class="form-control" id="add_node">
-                                <label for="add_node">Cookie</label><input type="text" class="form-control" id="add_cookie">
+                            <!-- <div> -->
+                                <!-- <label for="add_node">Node</label><input type="text" class="form-control" id="add_node">
+                                <label for="add_node">Cookie</label><input type="text" class="form-control" id="add_cookie"> -->
+                                <!-- <label for="nodes">Connected Nodes</label>
+                                <select class="form-control" id="nodes"></select>
                                 <label for="add_type">Type</label>
                                 <select class="form-control" id="add_type">
                                     <option>tcpip_port</option>
                                     <option>erlang_distribution</option>
-                                </select>
-                                <button class="btn btn-primary" id="addNodeBtn">Add</button>
-                                <label for="nodes">Connected Nodes</label>
-                                <select class="form-control" id="nodes"></select>
-                                <button class="btn btn-warning" id="disconnectBtn">Disconnect</button>
-                            </div>
+                                </select> -->
+                                <!-- <button class="btn btn-primary" id="addNodeBtn">Add</button> -->
+                                <!-- <button class="btn btn-warning" id="enableTraceBtn">Enable Tracing</button> -->
+                                <!-- <button class="btn btn-warning" id="disconnectBtn">Disconnect</button> -->
+                                <!-- <button class="btn btn-warning" id="disalbeTraceBtn">disalbe Tracing</button> -->
+                            <!-- </div> -->
 
                             <!-- <hr /> -->
-                            <div>
-                                <label for="trace_mod">Module</label>
+                            <!-- <div> -->
+                                <!-- <label for="trace_mod">Module</label> -->
                                 <!-- <input type="text" class="form-control" id="trace_mod" /> -->
-                                <select class="form-control" id="trace_mod"></select>
+                                <!-- <select class="form-control" id="trace_mod"></select> -->
                                 <!-- <button id="trace_mod_s">select</button> -->
-                                <label for="trace_fun">Function</label>
+                                <!-- <label for="trace_fun">Function</label> -->
                                 <!-- <input type="text" class="form-control" id="trace_fun"/> -->
-                                <select class="form-control" id="trace_fun"></select>
+                                <!-- <select class="form-control" id="trace_fun"></select> -->
                                 <!-- <button id="trace_mod_f">select</button> -->
                                 <!-- <label for="">Arity</label> -->
                                 <!-- <input type="text" class="form-control" id="trace_ara" /> -->
@@ -72,15 +74,15 @@
                                 <input type="text" class="form-control" id="trace_tim" /> -->
                                 <!-- <label for="">Messages</label>
                                 <input type="text" class="form-control" id="trace_mes" /> -->
-                                <button class="btn btn-primary" id="traceBtn">Trace</button>
+                                <!-- <button class="btn btn-primary" id="traceBtn">Trace</button>
                                 <label for="trace_patterns">Active Traces</label>
                                 <select class="form-control" id="trace_patterns" ></select>
                                 <button class="btn btn-warning" id="stopTracePatBtn">Stop Pattern</button>
-                                <button class="btn btn-danger" id="stopTraceBtn">Stop All Tracing</button>
-                            </div>
+                                <button class="btn btn-danger" id="stopTraceBtn">Stop All Tracing</button> -->
+                            <!-- </div> -->
 
                             <!-- <hr /> -->
-                            <div>
+                            <!-- <div>
                                 <img id="loaderImg" class="invisible" style="width:100px; height:100px;" src="img/loader.gif" />
                                 <button class="btn btn-info" id="pollBtn">poll</button>
                                 <button class="btn btn-info" id="stoppollBtn" disabled>stop poll</button>
@@ -88,8 +90,35 @@
                                 <select  class="form-control" id="fetchSelect"><option value="50" >50</option></select>
                                 <button class="btn btn-warning" id="clearBtn">Clear</button>
                                 <button class="btn btn-info" id="printBtn">Print</button>
-                            </div>
+                            </div> -->
 
+                    <!--     </th>
+                    </tr> -->
+                    <tr>
+                        <th colspan="5" class="form-inline">
+                            <div style="padding-bottom: 10px;">
+                                <button class="btn btn-warning" id="enable_trc_btn">Enable tracing</button>
+                                <button class="btn btn-warning" id="disable_trc_btn" disabled>Disable tracing</button>
+                                <label for="trace_patterns">Active Traces</label>
+                                <select class="form-control" id="trace_patterns" ></select>
+                            </div>
+                            <div > <!-- class="invisible" -->
+                                <label for="trace_mod">Module</label>
+                                <select class="form-control" id="trace_mod"></select>
+
+                                <label for="trace_func">Function</label> <!-- class="invisible" -->
+                                <select class="form-control" id="trace_func"> <!-- class="invisible" -->
+                                    <option value="*">*</option>
+                                </select>
+
+                                <label for="trace_ara">Arity</label>
+                                <select class="form-control" id="trace_func">
+                                    <option value="*">*</option>
+                                </select>
+
+                                <button class="btn btn-danger">Trace</button>
+
+                            </div>
                         </th>
                     </tr>
                     <tr>
