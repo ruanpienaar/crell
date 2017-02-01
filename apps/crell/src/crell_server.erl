@@ -212,8 +212,22 @@ handle_call(is_tracing, _From, State) ->
     {reply, State#?STATE.tracing, State};
 %% TODO: maybe add some more conditions,
 handle_call(toggle_tracing, _From, #?STATE{tracing=true} = State) ->
+    ok = orddict:fold(fun(Node,NodeDict,ok) ->
+        % io:format("Node:~p~n", [Node])
+        io:format("Disable tracing on : ~p~n", [Node]),
+        ok = goanna_api:remove_node(Node)
+        ok
+    end, ok, State#?STATE.nodes),
     {reply, false, State#?STATE{ tracing = false }};
 handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
+    ok = orddict:fold(fun(Node,NodeDict,ok) ->
+        % io:format("Node:~p~n", [Node])
+        Cookie = dict:fetch(cookie, NodeDict),
+        io:format("Enable tracing on : ~p~n", [Node]),
+        {error,{already_started,P}} = goanna_api:add_node(Node,Cookie,tcpip_port),
+        erlang:link(P),
+        ok
+    end, ok, State#?STATE.nodes),
     {reply, true, State#?STATE{ tracing = true }};
 
 handle_call(Request, _From, State) ->
@@ -244,7 +258,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 add_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
     {ok, RemoteState} = start_remote_code(Node, Cookie),
-    State#?STATE{ nodes = orddict:store(Node, RemoteState, N) }.
+    RemoteState2 = dict:store(cookie, Cookie, RemoteState),
+    State#?STATE{ nodes = orddict:store(Node, RemoteState2, N) }.
 
 remove_node(Node, _Cookie, #?STATE{ nodes = N } = State) ->
     State#?STATE{ nodes = orddict:erase(Node, N) }.

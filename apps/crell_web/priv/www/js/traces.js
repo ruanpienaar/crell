@@ -78,12 +78,12 @@
     var ws_url = "ws://"+arr[2]+"/crell/ws";
     var ws = new WebSocket(ws_url);
     ws.onopen = function(){
-        // ws.send(JSON.stringify({'module':'crell_server',
-        //                         'function':'nodes',
-        //                         'args':
-        //                             []
-        //                        })
-        // );
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'nodes',
+                                'args':
+                                    []
+                               })
+        );
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'is_tracing',
                                 'args':
@@ -99,11 +99,11 @@
                 alert('First add a node.');
                 window.location.href = 'index.html'
             } else {
-                $('#nodes').empty();
-                for(var n in json_data.nodes){
-                    var node = json_data.nodes[n];
-                    $('#nodes').append('<option value='+node+' >'+node+'</option>');
-                }
+                // $('#nodes').empty();
+                // for(var n in json_data.nodes){
+                //     var node = json_data.nodes[n];
+                //     $('#nodes').append('<option value='+node+' >'+node+'</option>');
+                // }
             }
         } else if(json_data.hasOwnProperty('is_tracing')) {
             if(json_data.is_tracing == 'true'){
