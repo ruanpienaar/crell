@@ -119,44 +119,44 @@
 
     }
 
-    $('#pollBtn').click(function(){
-        $('#pollBtn').attr("disabled", true);
-        $('#stoppollBtn').attr("disabled", false);
-        $('#loaderImg').attr("class", "visible");
-        gws.send( JSON.stringify({"polling":"true"}) );
-    });
+    // $('#pollBtn').click(function(){
+    //     $('#pollBtn').attr("disabled", true);
+    //     $('#stoppollBtn').attr("disabled", false);
+    //     $('#loaderImg').attr("class", "visible");
+    //     gws.send( JSON.stringify({"polling":"true"}) );
+    // });
 
-    $('#stoppollBtn').click(function(){
-        gws.send( JSON.stringify({"polling":"false"}) );
-    });
+    // $('#stoppollBtn').click(function(){
+    //     gws.send( JSON.stringify({"polling":"false"}) );
+    // });
 
-    $('#fetchBtn').click(function(evt){
-        gws.send( JSON.stringify( {"fetch":$('#fetchSelect').val()} ));
-    });
+    // $('#fetchBtn').click(function(evt){
+    //     gws.send( JSON.stringify( {"fetch":$('#fetchSelect').val()} ));
+    // });
 
-    $('#traceBtn').click(function(evt){
-        var trace_json = {
-            'mod':$('#trace_mod').val(),
-            'fun':$('#trace_fun').val(),
-            'ara':$('#trace_ara').val(),
-            'tim':$('#trace_tim').val(),
-            'mes':$('#trace_mes').val()
-        };
-        gws.send( JSON.stringify( {'trace': trace_json } ));
-    });
+    // $('#traceBtn').click(function(evt){
+    //     var trace_json = {
+    //         'mod':$('#trace_mod').val(),
+    //         'fun':$('#trace_fun').val(),
+    //         'ara':$('#trace_ara').val(),
+    //         'tim':$('#trace_tim').val(),
+    //         'mes':$('#trace_mes').val()
+    //     };
+    //     gws.send( JSON.stringify( {'trace': trace_json } ));
+    // });
 
-    $('#disconnectBtn').click(function(){
-        var ans=confirm('Do you want to disconnect '+$('#nodes option:selected').val());
-        if(ans){
-            gws.send(JSON.stringify({'module': 'goanna_api',
-                                        'function': 'remove_node',
-                                        'args':
-                                            [$('#nodes option:selected').val()]
-                                            //'['+$('#nodes option:selected').val()+']'
-                                       })
-            );
-        }
-    });
+    // $('#disconnectBtn').click(function(){
+    //     var ans=confirm('Do you want to disconnect '+$('#nodes option:selected').val());
+    //     if(ans){
+    //         gws.send(JSON.stringify({'module': 'goanna_api',
+    //                                     'function': 'remove_node',
+    //                                     'args':
+    //                                         [$('#nodes option:selected').val()]
+    //                                         //'['+$('#nodes option:selected').val()+']'
+    //                                    })
+    //         );
+    //     }
+    // });
 
     // $('#addNodeBtn').click(function(){
     //     gws.send(JSON.stringify({'module':'goanna_api',
@@ -169,33 +169,33 @@
     //     );
     // });
 
-    $('#trace_mod').change(function(){
-        gws.send(JSON.stringify({'module':'crell_server',
-                                    'function':'runtime_module_functions',
-                                    'args':
-                                        [$('#trace_mod').val()]
-                                   })
-        );
-    });
+    // $('#trace_mod').change(function(){
+    //     gws.send(JSON.stringify({'module':'crell_server',
+    //                                 'function':'runtime_module_functions',
+    //                                 'args':
+    //                                     [$('#trace_mod').val()]
+    //                                })
+    //     );
+    // });
 
-    $('#stopTracePatBtn').click(function(){
-        gws.send(JSON.stringify({'module':'goanna_api',
-                                    'function':'stop_trace',
-                                    'args':
-                                        [$('#trace_patterns').val()]
-                                   })
-        );
-    });
+    // $('#stopTracePatBtn').click(function(){
+    //     gws.send(JSON.stringify({'module':'goanna_api',
+    //                                 'function':'stop_trace',
+    //                                 'args':
+    //                                     [$('#trace_patterns').val()]
+    //                                })
+    //     );
+    // });
 
-    $('#stopTraceBtn').click(function(){
-        gws.send( JSON.stringify({"polling":"false"}) );
-        gws.send(JSON.stringify({'module':'goanna_api',
-                                    'function':'stop_trace',
-                                    'args':
-                                        []
-                                   })
-        );
-    });
+    // $('#stopTraceBtn').click(function(){
+    //     gws.send( JSON.stringify({"polling":"false"}) );
+    //     gws.send(JSON.stringify({'module':'goanna_api',
+    //                                 'function':'stop_trace',
+    //                                 'args':
+    //                                     []
+    //                                })
+    //     );
+    // });
 
     $('#enable_trc_btn').click(function(){
         ws.send(JSON.stringify({'module':'crell_server',

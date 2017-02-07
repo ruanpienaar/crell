@@ -215,7 +215,8 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=true} = State) ->
     ok = orddict:fold(fun(Node,NodeDict,ok) ->
         % io:format("Node:~p~n", [Node])
         io:format("Disable tracing on : ~p~n", [Node]),
-        ok = goanna_api:remove_node(Node)
+        true = goanna_api:remove_goanna_callbacks(Node),
+        ok = goanna_api:remove_goanna_node(Node),
         ok
     end, ok, State#?STATE.nodes),
     {reply, false, State#?STATE{ tracing = false }};
@@ -224,8 +225,8 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
         % io:format("Node:~p~n", [Node])
         Cookie = dict:fetch(cookie, NodeDict),
         io:format("Enable tracing on : ~p~n", [Node]),
-        {error,{already_started,P}} = goanna_api:add_node(Node,Cookie,tcpip_port),
-        erlang:link(P),
+        % {error,{already_started,P}} = goanna_api:add_node(Node,Cookie,tcpip_port),
+        {ok,updated} = goanna_api:add_node_callbacks(Node, Cookie),
         ok
     end, ok, State#?STATE.nodes),
     {reply, true, State#?STATE{ tracing = true }};
