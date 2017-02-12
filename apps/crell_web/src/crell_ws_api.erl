@@ -65,8 +65,23 @@ websocket_handle({text, ReqJson}, Req, State) ->
          {<<"function">>,<<"toggle_tracing">>},
          {<<"args">>,[]}] ->
             {reply, reply("is_tracing", crell_server:toggle_tracing()), Req, State};
+
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"cluster_modules">>},
+         {<<"args">>,[]}] ->
+            Mods = crell_server:cluster_modules(),
+            ModsJson = mods_json(Mods, []),
+            {reply, {text, ModsJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"cluster_module_functions">>},
+         {<<"args">>,[Mod]}] ->
+            ModsFuncs = crell_server:cluster_module_functions(
+                crell_web_utils:ens_atom(Mod)
+            ),
+            ModsFuncJson = mod_funcs_json(ModsFuncs, []),
+            {reply, {text, ModsFuncJson}, Req, State};
         UnknownJson ->
-            io:format("UnknownJson: ~p~n", [UnknownJson]),
+            io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
             {reply, {text, Json}, Req, State}
     end.
@@ -143,3 +158,9 @@ mods_json([], R) ->
     jsx:encode([{<<"mods">>, lists:reverse(R)}]);
 mods_json([H|T] , R) ->
     mods_json(T, [list_to_binary(atom_to_list(H))|R]).
+
+mod_funcs_json([], R) ->
+    jsx:encode([{<<"mod_funcs">>, lists:reverse(R)}]);
+mod_funcs_json([{Mod,Ara}|T] , R) ->
+    % mod_funcs_json(T, [list_to_binary(atom_to_list(H))|R]).
+    mod_funcs_json(T, [list_to_binary(io_lib:format("~p/~p",[Mod,Ara]))|R]).

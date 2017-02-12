@@ -10,16 +10,9 @@
     var host = "ws://"+arr[2]+"/goanna_api/ws";
     var gws = new WebSocket(host);
     gws.onopen = function(){
-        //message('onopen : '+socket.readyState+' (open)');
-        // gws.send(JSON.stringify({'get':'nodes'}));
-        gws.send(JSON.stringify({'get':'active_traces'}));
     }
 
     gws.onmessage = function(msg){
-
-        // only allow the rest, if there are nodes...
-        // gws.send(JSON.stringify({'get':'active_traces'}));
-        // gws.send(JSON.stringify({'get':'runtime_modules'}));
 
         if(msg.data=='ok'){
             // why did we return ok anyways???...
@@ -38,19 +31,12 @@
                     var mfastr = obj['module']+':'+obj['function']+'/'+obj['arity'];
                     $('#trace_patterns').append('<option value='+mfastr+'>'+mfastr+'</option>');
                 }
-            } else if(json_data.hasOwnProperty('runtime_modules')) {
-                $('#trace_mod').empty();
-                $('#trace_mod').append('<option value="*" >*</option>');
-                for(var i = 0; i < json_data['runtime_modules'].length; i++) {
-                    var obj = json_data['runtime_modules'][i];
-                    $('#trace_mod').append('<option value='+obj+' >'+obj+'</option>')
-                }
             } else if(json_data.hasOwnProperty('functions')) {
-                $('#trace_fun').empty();
-                $('#trace_fun').append('<option value="*" >*</option>');
+                $('#trace_func').empty();
+                $('#trace_func').append('<option value="*" >*</option>');
                 for(var i = 0; i < json_data['functions'].length; i++) {
                     var obj = json_data['functions'][i];
-                    $('#trace_fun').append('<option value='+obj+' >'+obj+'</option>')
+                    $('#trace_func').append('<option value='+obj+' >'+obj+'</option>')
                 }
             } else if(json_data.hasOwnProperty('traces')) {
                 for(var i = 0; i < json_data['traces'].length; i++) {
@@ -58,9 +44,11 @@
 
                 }
             } else if(json_data.hasOwnProperty('traces_polling_end')) {
-                $('#pollBtn').attr("disabled", false);
-                $('#stoppollBtn').attr("disabled", true);
-                $('#loaderImg').attr("class", "invisible");
+                if($('#disable_trc_btn').prop('disabled')){
+                    disable_all_polling_input();
+                } else {
+                    disable_polling_input();
+                }
             }
         }
     }
@@ -99,19 +87,84 @@
                 alert('First add a node.');
                 window.location.href = 'index.html'
             } else {
-                // $('#nodes').empty();
-                // for(var n in json_data.nodes){
-                //     var node = json_data.nodes[n];
-                //     $('#nodes').append('<option value='+node+' >'+node+'</option>');
-                // }
+                $('#nodes').empty();
+                for(var n in json_data.nodes){
+                    var node = json_data.nodes[n];
+                    $('#nodes').append('<option value='+node+' >'+node+'</option>');
+                }
             }
         } else if(json_data.hasOwnProperty('is_tracing')) {
             if(json_data.is_tracing == 'true'){
                 $('#enable_trc_btn').attr("disabled", true);
                 $('#disable_trc_btn').attr("disabled", false);
+                $('#trace_patterns').attr("disabled", false);
+                $('#trace_mod').attr("disabled", false);
+                //$('#trace_func').attr("disabled", false);
+                $('#trace_ara').attr("disabled", false);
+                $('#trace_tim').attr("disabled", false);
+                $('#trace_mes').attr("disabled", false);
+                // $('#traceBtn').attr("disabled", false);
+                $('#stopTracePatBtn').attr("disabled", false);
+                $('#stopTraceBtn').attr("disabled", false);
+
+                // tracing controls
+                $('#pollBtn').attr("disabled", false);
+                //$('#stoppollBtn').attr("disabled", false);
+                $('#fetchBtn').attr("disabled", false);
+                $('#fetchSelect').attr("disabled", false);
+                $('#clearBtn').attr("disabled", false);
+                $('#printBtn').attr("disabled", false);
+                gws.send(JSON.stringify({
+                    'module':'goanna_api',
+                    'function':'list_active_traces',
+                    'args':
+                        []
+                    })
+                );
+                ws.send(JSON.stringify({
+                    'module':'crell_server',
+                    'function':'cluster_modules',
+                    'args':
+                        []
+                    })
+                );
+                // gws.send(JSON.stringify({'get':'active_traces'}));
+                // gws.send(JSON.stringify({'get':'runtime_modules'}));
             } else if(json_data.is_tracing == 'false') {
+                gws.send( JSON.stringify({"polling":"false"}) );
                 $('#enable_trc_btn').attr("disabled", false);
                 $('#disable_trc_btn').attr("disabled", true);
+                $('#trace_patterns').attr("disabled", true);
+                $('#trace_mod').attr("disabled", true);
+                $('#trace_func').attr("disabled", true);
+                $('#trace_ara').attr("disabled", true);
+                $('#trace_tim').attr("disabled", true);
+                $('#trace_mes').attr("disabled", true);
+                $('#traceBtn').attr("disabled", true);
+                $('#stopTracePatBtn').attr("disabled", true);
+                $('#stopTraceBtn').attr("disabled", true);
+
+                // tracing controls
+                $('#pollBtn').attr("disabled", true);
+                //$('#stoppollBtn').attr("disabled", true);
+                $('#fetchBtn').attr("disabled", true);
+                $('#fetchSelect').attr("disabled", true);
+                $('#clearBtn').attr("disabled", true);
+                $('#printBtn').attr("disabled", true);
+            }
+        } else if(json_data.hasOwnProperty('mods')) {
+            $('#trace_mod').empty();
+            $('#trace_mod').append('<option value="*" >*</option>');
+            for(var i = 0; i < json_data['mods'].length; i++) {
+                var obj = json_data['mods'][i];
+                $('#trace_mod').append('<option value='+obj+' >'+obj+'</option>');
+            }
+        } else if(json_data.hasOwnProperty('mod_funcs')) {
+            $('#trace_func').empty();
+            $('#trace_func').append('<option value="*" >*</option>');
+            for(var i = 0; i < json_data['mod_funcs'].length; i++) {
+                var obj = json_data['mod_funcs'][i];
+                $('#trace_func').append('<option value='+obj+' >'+obj+'</option>');
             }
         }
     }
@@ -119,83 +172,72 @@
 
     }
 
-    // $('#pollBtn').click(function(){
-    //     $('#pollBtn').attr("disabled", true);
-    //     $('#stoppollBtn').attr("disabled", false);
-    //     $('#loaderImg').attr("class", "visible");
-    //     gws.send( JSON.stringify({"polling":"true"}) );
-    // });
+    $('#pollBtn').click(function(){
+        $('#pollBtn').attr("disabled", true);
+        $('#stoppollBtn').attr("disabled", false);
+        $('#loaderImg').attr("class", "visible");
+        $('#fetchBtn').attr("disabled", true);
+        gws.send( JSON.stringify({"polling":"true"}) );
+    });
 
-    // $('#stoppollBtn').click(function(){
-    //     gws.send( JSON.stringify({"polling":"false"}) );
-    // });
+    $('#stoppollBtn').click(function(){
+        gws.send( JSON.stringify({"polling":"false"}) );
+    });
 
-    // $('#fetchBtn').click(function(evt){
-    //     gws.send( JSON.stringify( {"fetch":$('#fetchSelect').val()} ));
-    // });
+    $('#fetchBtn').click(function(evt){
+        // gws.send( JSON.stringify( {"fetch":$('#fetchSelect').val()} ));
+        gws.send(JSON.stringify({'module':'goanna_api',
+                                 'function':'pull_all_traces',
+                                 'args':
+                                    [
+                                     ]
+                               })
+        );
+    });
 
-    // $('#traceBtn').click(function(evt){
-    //     var trace_json = {
-    //         'mod':$('#trace_mod').val(),
-    //         'fun':$('#trace_fun').val(),
-    //         'ara':$('#trace_ara').val(),
-    //         'tim':$('#trace_tim').val(),
-    //         'mes':$('#trace_mes').val()
-    //     };
-    //     gws.send( JSON.stringify( {'trace': trace_json } ));
-    // });
+    $('#traceBtn').click(function(evt){
+        gws.send(JSON.stringify({'module':'goanna_api',
+                                 'function':'trace',
+                                 'args':
+                                    [$('#trace_mod').val(),
+                                     $('#trace_func').val(),
+                                     // $('#trace_ara').val(),
+                                     $('#trace_tim').val(),
+                                     $('#trace_mes').val()
+                                     ]
+                               })
+        );
 
-    // $('#disconnectBtn').click(function(){
-    //     var ans=confirm('Do you want to disconnect '+$('#nodes option:selected').val());
-    //     if(ans){
-    //         gws.send(JSON.stringify({'module': 'goanna_api',
-    //                                     'function': 'remove_node',
-    //                                     'args':
-    //                                         [$('#nodes option:selected').val()]
-    //                                         //'['+$('#nodes option:selected').val()+']'
-    //                                    })
-    //         );
-    //     }
-    // });
+    });
 
-    // $('#addNodeBtn').click(function(){
-    //     gws.send(JSON.stringify({'module':'goanna_api',
-    //                                 'function':'add_node',
-    //                                 'args':
-    //                                     [$('#add_node').val(),
-    //                                      $('#add_cookie').val(),
-    //                                      $('#add_type').val()]
-    //                                })
-    //     );
-    // });
+    $('#printBtn').click(function(){
+        window.print();
+    })
 
-    // $('#trace_mod').change(function(){
-    //     gws.send(JSON.stringify({'module':'crell_server',
-    //                                 'function':'runtime_module_functions',
-    //                                 'args':
-    //                                     [$('#trace_mod').val()]
-    //                                })
-    //     );
-    // });
+    $('#clearBtn').click(function(){
+        $('#traces_table').empty();
+    });
 
-    // $('#stopTracePatBtn').click(function(){
-    //     gws.send(JSON.stringify({'module':'goanna_api',
-    //                                 'function':'stop_trace',
-    //                                 'args':
-    //                                     [$('#trace_patterns').val()]
-    //                                })
-    //     );
-    // });
+    $('#stopTracePatBtn').click(function(){
+        if($('#trace_patterns').val() != null){
+            gws.send(JSON.stringify({'module':'goanna_api',
+                                        'function':'stop_trace',
+                                        'args':
+                                            [$('#trace_patterns').val()]
+                                       })
+            );
+        }
+    });
 
-    // $('#stopTraceBtn').click(function(){
-    //     gws.send( JSON.stringify({"polling":"false"}) );
-    //     gws.send(JSON.stringify({'module':'goanna_api',
-    //                                 'function':'stop_trace',
-    //                                 'args':
-    //                                     []
-    //                                })
-    //     );
-    // });
+    $('#stopTraceBtn').click(function(){
+        gws.send( JSON.stringify({"polling":"false"}) );
+        gws.send(JSON.stringify({'module':'goanna_api',
+                                    'function':'stop_trace',
+                                    'args':
+                                        []
+                                   })
+        );
+    });
 
     $('#enable_trc_btn').click(function(){
         ws.send(JSON.stringify({'module':'crell_server',
@@ -206,6 +248,7 @@
         );
     });
     $('#disable_trc_btn').click(function(){
+        reset_inputs();
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'toggle_tracing',
                                 'args':
@@ -246,6 +289,48 @@
                 console.log('Dropped '+obj['dropped']+' trace msgs.');
                 break;
         }
+    }
+
+    $('#trace_mod').change(function(){
+        //get_functions($('#trace_mod').val());
+        if($('#trace_mod').val() != "*"){
+            $('#traceBtn').attr("disabled", false);
+            $('#trace_func').attr("disabled", false);
+            ws.send(JSON.stringify({'module':'crell_server',
+                                    'function':'cluster_module_functions',
+                                    'args':[$('#trace_mod').val()]
+                                  }
+            ));
+        } else if($('#trace_mod').val() == "*"){
+            $('#traceBtn').attr("disabled", true);
+            $('#trace_func').attr("disabled", true);
+        } else {
+            alert('panic '+$('#trace_mod').val());
+        }
+    });
+
+    function disable_polling_input(){
+        $('#pollBtn').attr("disabled", false);
+        $('#stoppollBtn').attr("disabled", true);
+        $('#fetchBtn').attr("disabled", false);
+        $('#loaderImg').attr("class", "invisible");
+    }
+
+    function disable_all_polling_input(){
+        $('#pollBtn').attr("disabled", true);
+        $('#stoppollBtn').attr("disabled", true);
+        $('#fetchBtn').attr("disabled", true);
+        $('#loaderImg').attr("class", "invisible");
+    }
+
+    function reset_inputs(){
+        $('#trace_mod').empty();
+        $('#trace_mod').append('<option value="*" >*</option>');
+        $('#trace_func').empty();
+        $('#trace_func').append('<option value="*" >*</option>');
+        $('#trace_tim').empty();
+        $('#trace_mes').empty();
+        $('#trace_patterns').empty();
     }
 
   });

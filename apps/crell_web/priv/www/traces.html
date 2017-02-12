@@ -31,8 +31,10 @@
           </ul>
         </nav>
       </div>
-      <!-- <div class="jumbotron"> -->
       <div class="container-fluid">
+        <div class="form-inline">
+            <p>Existing nodes <select class="form-control" id="nodes"></select></p>
+        </div>
 
         <div>
             <table class="table table-bordered table-striped">
@@ -97,28 +99,49 @@
                     <tr>
                         <th colspan="5" class="form-inline">
                             <div style="padding-bottom: 10px;">
+
                                 <button class="btn btn-warning" id="enable_trc_btn">Enable tracing</button>
                                 <button class="btn btn-warning" id="disable_trc_btn" disabled>Disable tracing</button>
-                                <label for="trace_patterns">Active Traces</label>
-                                <select class="form-control" id="trace_patterns" disabled></select>
-                            </div>
-                            <div > <!-- class="invisible" -->
+
                                 <label for="trace_mod">Module</label>
-                                <select class="form-control" id="trace_mod"  disabled></select>
+                                <select class="form-control" id="trace_mod" disabled></select>
 
                                 <label for="trace_func">Function</label> <!-- class="invisible" -->
                                 <select class="form-control" id="trace_func"  disabled> <!-- class="invisible" -->
                                     <option value="*">*</option>
                                 </select>
 
-                                <label for="trace_ara">Arity</label>
-                                <select class="form-control" id="trace_func"  disabled>
+                                <!-- <label for="trace_ara">Arity</label>
+                                <select class="form-control" id="trace_ara"  disabled>
                                     <option value="*">*</option>
-                                </select>
+                                </select> -->
 
-                                <button class="btn btn-danger"  disabled>Trace</button>
+                                <label for="trace_tim">Total trace time</label>
+                                <input type="text" maxlength="4" size="4" class="form-control" id="trace_tim" value="60"  />(s)
+
+                                <label for="">Total trace messages</label>
+                                <input type="text" maxlength="4" size="4" class="form-control" id="trace_mes" />
+
+                                <button class="btn btn-danger" id="traceBtn" disabled>Trace</button>
+                            </div>
+                            <div style="padding-bottom: 10px;">
+                                <label for="trace_patterns">Active Traces</label>
+                                <select class="form-control" id="trace_patterns" disabled></select>
+
+                                <button class="btn btn-warning" id="stopTracePatBtn">Stop Pattern</button>
+                                <button class="btn btn-danger" id="stopTraceBtn">Stop All Tracing</button>
 
                             </div>
+                            <div style="padding-bottom: 10px;">
+                                <button class="btn btn-info" id="pollBtn">poll</button>
+                                <button class="btn btn-info" id="stoppollBtn" disabled>stop poll</button>
+                                <button class="btn btn-info" id="fetchBtn">fetch</button>
+                                <select  class="form-control" id="fetchSelect"><option value="50" >50</option></select>
+                                <button class="btn btn-warning" id="clearBtn">Clear</button>
+                                <button class="btn btn-info" id="printBtn">Print</button>
+                                <img id="loaderImg" class="invisible" style="width:100px; height:100px;" src="img/loader.gif" />
+                            </div>
+
                         </th>
                     </tr>
                     <tr>

@@ -7,7 +7,8 @@
 -define(STATE, crell_server_state).
 -record(?STATE, {
     nodes=orddict:new(),
-    tracing=false
+    tracing=false,
+    cluster_modules
 }).
 
 -export([
@@ -16,7 +17,9 @@
     remove_node/1,
     nodes/0,
     runtime_modules/1,
-    runtime_module_functions/2,
+    cluster_modules/0,
+    cluster_module_functions/1,
+    % runtime_module_functions/2,
     %module_source/2,
     non_sys_processes/1,
     calc_app/2,
@@ -80,8 +83,14 @@ nodes() ->
 runtime_modules(Node) ->
     gen_server:call(?MODULE, {runtime_modules, Node}).
 
-runtime_module_functions(Node, Mod) ->
-    gen_server:call(?MODULE, {runtime_module_functions, Node, Mod}).
+cluster_modules() ->
+    gen_server:call(?MODULE, cluster_modules).
+
+cluster_module_functions(Mod) ->
+    gen_server:call(?MODULE, {cluster_module_functions, Mod}).
+
+% runtime_module_functions(Node, Mod) ->
+%     gen_server:call(?MODULE, {runtime_module_functions, Node, Mod}).
 
 % module_source(_Node, Module) ->
 %     get_source(Module).
@@ -171,10 +180,29 @@ handle_call({runtime_modules, Node}, _From, State) ->
     % Update state here
     {ok, Reply, NewState} = node_ordict_values(Node, State, get_remote_modules),
     {reply, Reply, NewState};
-handle_call({runtime_module_functions, Node, Mod}, _From, State) ->
-    % Update state here
-    {ok, Reply, _} = node_ordict_values(Node, State, {get_remote_module_functions, Mod}),
+
+
+handle_call(cluster_modules, _From, State) ->
+    %% TODO: we need to make a update cluster_state function
+    %% TODO: group erlang nodes together based on a cookie/some-family, some label??
+    %% Aggregate the nodes' modules, check consistency, and update state.
+
+    %% TODO: hack, just use the last Node's modules...
+    LastNode = lists:last(orddict:fetch_keys(State#?STATE.nodes)),
+    {ok, Reply, NewState} = node_ordict_values(LastNode, State, get_remote_modules),
+
     {reply, Reply, State};
+handle_call({cluster_module_functions,Mod}, _From, State) ->
+    %% TODO: hack, just use the last Node's modules...
+    LastNode = lists:last(orddict:fetch_keys(State#?STATE.nodes)),
+    {ok, Reply, NewState} = node_ordict_values(LastNode, State, {get_remote_module_functions,Mod}),
+    {reply, Reply, NewState};
+% handle_call({runtime_module_functions, Node, Mod}, _From, State) ->
+%     % Update state here
+%     {ok, Reply, _} = node_ordict_values(Node, State, {get_remote_module_functions, Mod}),
+%     {reply, Reply, State};
+
+
 handle_call({non_sys_processes, Node}, _From, State) ->
     % Update state here
     {ok, Reply, _} = node_ordict_values(Node, State, non_sys_processes),
@@ -213,11 +241,10 @@ handle_call(is_tracing, _From, State) ->
 %% TODO: maybe add some more conditions,
 handle_call(toggle_tracing, _From, #?STATE{tracing=true} = State) ->
     ok = orddict:fold(fun(Node,NodeDict,ok) ->
-        % io:format("Node:~p~n", [Node])
         io:format("Disable tracing on : ~p~n", [Node]),
+        ok = goanna_api:stop_trace(),
         true = goanna_api:remove_goanna_callbacks(Node),
-        ok = goanna_api:remove_goanna_node(Node),
-        ok
+        ok = goanna_api:remove_goanna_node(Node)
     end, ok, State#?STATE.nodes),
     {reply, false, State#?STATE{ tracing = false }};
 handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
@@ -260,7 +287,9 @@ code_change(_OldVsn, State, _Extra) ->
 add_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
     {ok, RemoteState} = start_remote_code(Node, Cookie),
     RemoteState2 = dict:store(cookie, Cookie, RemoteState),
-    State#?STATE{ nodes = orddict:store(Node, RemoteState2, N) }.
+    State#?STATE{
+        nodes = orddict:store(Node, RemoteState2, N)
+    }.
 
 remove_node(Node, _Cookie, #?STATE{ nodes = N } = State) ->
     State#?STATE{ nodes = orddict:erase(Node, N) }.

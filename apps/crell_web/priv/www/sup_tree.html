@@ -60,12 +60,13 @@
         </nav>
       </div>
 
-      <div class="jumbotron">
+      <div class="container-fluid">
 
-        <h2>Supervision Tree</h2>
+        <h2>Erlang supervision tree</h2>
 
-        <p>Existing nodes</p>
-        <select id="nodes"></select>
+        <div class="form-inline">
+            <p>Existing nodes <select class="form-control" id="nodes"></select></p>
+        </div>
 
         <p>Applications</p>
         <select id="apps_select" onchange="draw()"></select>

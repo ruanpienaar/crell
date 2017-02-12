@@ -19,68 +19,24 @@ init(Req, Opts) ->
 websocket_handle({text, ReqJson}, Req, State) ->
     % io:format("State : ~p~n", [State]),
     case jsx:decode(ReqJson) of
-        [{<<"get">>, <<"nodes">>}] ->
-            Json = get_nodes_json(),
-            {reply, {text, Json}, Req, State};
-
-        [{<<"get">>, <<"active_traces">>}] ->
-        Json = active_traces_json(),
-            {reply, {text, Json}, Req, State};
-
-        [{<<"get">>, <<"runtime_modules">>}] ->
-            JsonRunMods = jsx:encode( [ {<<"runtime_modules">>,
-                                        [ crell_web_utils:ens_bin(Mod) || Mod <- crell_server:runtime_modules() ]}
-                                      ] ),
-            {reply, {text, JsonRunMods}, Req, State};
-
-        [{<<"trace">>, Details}] ->
-            ok = trace(Details),
-            Json = active_traces_json(),
-            {reply, {text, Json}, Req, State};
-
-        %% Use a countdown timer to only poll, for a while..
         [{<<"polling">>,<<"true">>}] ->
             poller(100, 100),
             {reply, {text, <<"ok">>}, Req, State#?STATE{ polling = true }};
-
         [{<<"polling">>,<<"false">>}] ->
-            %% stop_poller(),
             {reply, {text, <<"ok">>}, Req, State#?STATE{ polling = false }};
-
-        [{<<"fetch">>,_SizeBin}] ->
+        [{<<"module">>,<<"goanna_api">>},
+         {<<"function">>,<<"pull_all_traces">>},
+         {<<"args">>,[]}] ->
             % _SizeInt = list_to_integer(binary_to_list(SizeBin)),
             Json = all_traces_json(),
             {reply, {text, Json}, Req, State};
-
         [{<<"module">>,<<"goanna_api">>},
-         {<<"function">>,<<"remove_node">>},
-         {<<"args">>,[Node]}] ->
-            %% TODO: how will i handle errors?
-            ok = goanna_api:remove_node(list_to_atom(binary_to_list(Node))),
-            Json = get_nodes_json(),
+         {<<"function">>,<<"trace">>},
+         {<<"args">>,[Mod,FuncAndAra,TimeSeconds,Messages]}] ->
+            list_active_traces_poller(),
+            ok = trace(Mod,FuncAndAra,TimeSeconds,Messages),
+            Json = active_traces_json(),
             {reply, {text, Json}, Req, State};
-
-        [{<<"module">>,<<"goanna_api">>},
-         {<<"function">>,<<"add_node">>},
-         {<<"args">>,[Node, Cookie, Type]}] ->
-            %% TODO: how will i handle errors?
-             {ok, _GoannaNodePid} =
-                  goanna_api:add_node(list_to_atom(binary_to_list(Node)),
-                                      list_to_atom(binary_to_list(Cookie)),
-                                      list_to_atom(binary_to_list(Type))
-                                     ),
-            Json = get_nodes_json(),
-            {reply, {text, Json}, Req, State};
-
-        [{<<"module">>,<<"crell_server">>},
-         {<<"function">>,<<"runtime_module_functions">>},
-         {<<"args">>,[Mod]}] ->
-            %% TODO: maybe list * as an arity, so the front end user, can select, all arity.
-            Functions = crell_server:runtime_module_functions(list_to_atom(binary_to_list(Mod))),
-            Json = jsx:encode([{<<"functions">>, [ crell_web_utils:ens_bin(atom_to_list(F)++"/"++integer_to_list(Arity))
-                || {F,Arity} <- Functions ]}]),
-            {reply, {text, Json}, Req, State};
-
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[]}] ->
@@ -88,19 +44,22 @@ websocket_handle({text, ReqJson}, Req, State) ->
             ok = goanna_api:stop_trace(),
             Json = active_traces_json(),
             {reply, {text, Json}, Req, State};
-
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[TrcPattern]}] ->
             [M, F, A] = trcpat_mfa_to_str(TrcPattern),
             %% TODO: handle * as all arity, so call, stop_trace(M,F)
-            io:format("Here 2~n", []),
+            io:format("~p",[ [M, F, A] ]),
             ok = goanna_api:stop_trace(M, F, A),
             Json = active_traces_json(),
             {reply, {text, Json}, Req, State};
-
+        [{<<"module">>,<<"goanna_api">>},
+         {<<"function">>,<<"list_active_traces">>},
+         {<<"args">>,[]}] ->
+            Json = active_traces_json(),
+            {reply, {text, Json}, Req, State};
         UnknownJson ->
-            io:format("UnknownJson: ~p~n", [UnknownJson]),
+            io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
             {reply, {text, Json}, Req, State}
     end;
@@ -131,19 +90,22 @@ poller(Ms, Count) when Count =< 0 ->
 poller(Ms, Count) when Count > 0 ->
     erlang:start_timer(Ms, self(), {<<"fetch">>, Count}).
 
+list_active_traces_poller() ->
+    LATPollerRef = erlang:start_timer(1000, self(), {<<"list_active_traces">>, Count}).
+
 ensure_info(T) ->
     crell_web_utils:ens_bin(io_lib:format("~p", [T])).
 
 ensure_extra(T) ->
     crell_web_utils:ens_bin(io_lib:format("~p", [T])).
 
-dbg_trace_format_to_json({Now, {trace, Pid, Label, Info}}) ->
+dbg_trace_format_to_json({Now, {T, Pid, Label, Info}}) when T==trace; T==trace_ts ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
      {<<"type">>, crell_web_utils:ens_bin(trace)},
      {<<"pid">>, crell_web_utils:ens_bin(Pid)},
      {<<"label">>, crell_web_utils:ens_bin(Label)},
      {<<"info">>, ensure_info(Info)}];
-dbg_trace_format_to_json({Now, {trace, Pid, Label, Info, Extra}}) ->
+dbg_trace_format_to_json({Now, {T, Pid, Label, Info, Extra}}) when T==trace; T==trace_ts ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
      {<<"type">>, crell_web_utils:ens_bin(trace_extra)},
      {<<"pid">>, crell_web_utils:ens_bin(Pid)},
@@ -155,13 +117,26 @@ dbg_trace_format_to_json({Now, {drop, NumDropped}}) ->
      {<<"type">>, crell_web_utils:ens_bin(drop)},
      {<<"dropped">>, crell_web_utils:ens_bin(NumDropped)}].
 
-trace([{<<"mod">>,Mod},
-       {<<"fun">>,<<"*">>}]) ->
-    goanna_api:trace(crell_web_utils:ens_atom(Mod));
-trace([{<<"mod">>,Mod},
-       {<<"fun">>,Fun}]) ->
-    [F,A] = trcpat_fa_to_str(Fun),
-    goanna_api:trace(crell_web_utils:ens_atom(Mod), F, A).
+trace(BinMod,<<"*">>,BinTimeSeconds,BinMessages) ->
+    ok = goanna_api:trc(binary_to_list(BinMod), trace_opts(BinTimeSeconds,BinMessages));
+trace(BinMod,BinFunc,BinTimeSeconds,BinMessages) ->
+    ok = goanna_api:trc(binary_to_list(BinMod)++":"++binary_to_list(BinFunc), trace_opts(BinTimeSeconds,BinMessages)).
+
+trace_opts(<<"">>,<<"">>) ->
+    [{time, false}, {messages, false}];
+trace_opts(<<"">>, BinMessages) ->
+    [{time, false}, {messages, binary_to_integer(BinMessages)}];
+trace_opts(BinSecs, <<"">>) ->
+    [{time, binary_to_integer(BinSecs)*1000}, {messages, false}];
+trace_opts(BinSecs, BinMessages) ->
+    [{time, binary_to_integer(BinSecs)*1000}, {messages, binary_to_integer(BinMessages)}].
+% trace([{<<"mod">>,Mod},
+%        {<<"fun">>,<<"*">>}]) ->
+%     goanna_api:trace(crell_web_utils:ens_atom(Mod));
+% trace([{<<"mod">>,Mod},
+%        {<<"fun">>,Fun}]) ->
+%     [F,A] = trcpat_fa_to_str(Fun),
+%     goanna_api:trace(crell_web_utils:ens_atom(Mod), F, A).
 %%trace([{<<"mod">>,Mod},
 %%       {<<"fun">>,Fun},
 %%       {<<"ara">>,Arity},
@@ -205,25 +180,20 @@ get_nodes_json() ->
 active_traces_json() ->
     ActiveTracesFull = goanna_api:list_active_traces(),
             ActiveTraces =
-                lists:foldl(fun({{Node,TrcPattern},Now,TrcOpts}, Acc) ->
-                    case lists:keyfind(TrcPattern, 1, Acc) of
-                        false ->
-                            [{TrcPattern,
-                              crell_web_utils:ens_bin(TrcPattern#trc_pattern.m),
-                              crell_web_utils:ens_bin(undef_function(TrcPattern#trc_pattern.f)),
-                              crell_web_utils:ens_bin(undef_arity(TrcPattern#trc_pattern.a))
-                            }|Acc];
-                        {TrcPattern,_,_,_} ->
-                            Acc
-                    end
-                end, [], ActiveTracesFull),
+                lists:map(fun({{Node,TrcPattern}, TrcOpts}) ->
+                    { crell_web_utils:ens_bin(TrcPattern#trc_pattern.m),
+                      crell_web_utils:ens_bin(undef_function(TrcPattern#trc_pattern.f)),
+                      crell_web_utils:ens_bin(undef_arity(TrcPattern#trc_pattern.a)),
+                      crell_web_utils:ens_bin(io_lib:format("~p",[TrcPattern#trc_pattern.ms]))
+                    }
+                end, ActiveTracesFull),
             jsx:encode(
                 [{<<"active_traces">>,
-                    [ [
-                        {<<"module">>,   M},
+                    [ [ {<<"module">>,   M},
                         {<<"function">>, F},
-                        {<<"arity">>,    A}
-                      ] || {_, M,F,A} <- ActiveTraces ]
+                        {<<"arity">>,    A},
+                        {<<"ms">>,       MS}
+                      ] || {M,F,A,MS} <- ActiveTraces ]
                 }]
             ).
 
