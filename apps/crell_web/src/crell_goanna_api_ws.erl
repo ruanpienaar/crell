@@ -7,7 +7,8 @@
 -export([websocket_info/3]).
 
 -define(STATE, crell_goanna_api_ws).
--record(?STATE, { polling = false }).
+-record(?STATE, { polling = false,
+                  list_all_active_traces_poller_ref }).
 
 
 init(Req, Opts) ->
@@ -33,17 +34,18 @@ websocket_handle({text, ReqJson}, Req, State) ->
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"trace">>},
          {<<"args">>,[Mod,FuncAndAra,TimeSeconds,Messages]}] ->
-            list_active_traces_poller(),
+            R = list_active_traces_poller(),
             ok = trace(Mod,FuncAndAra,TimeSeconds,Messages),
             Json = active_traces_json(),
-            {reply, {text, Json}, Req, State};
+            {reply, {text, Json}, Req, State#?STATE{list_all_active_traces_poller_ref = R}};
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[]}] ->
             io:format("Here 1~n", []),
             ok = goanna_api:stop_trace(),
             Json = active_traces_json(),
-            {reply, {text, Json}, Req, State};
+            {reply, {text, Json}, Req,
+                State#?STATE{list_all_active_traces_poller_ref = undefined}};
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[TrcPattern]}] ->
@@ -67,6 +69,14 @@ websocket_handle(Data, Req, State) ->
     io:format("websocket_handle : ~p\n\n", [Data]),
     {ok, Req, State}.
 
+websocket_info({timeout, _Ref, list_active_traces}, Req,
+        #?STATE{list_all_active_traces_poller_ref = undefined } = State) ->
+    {reply, {text, Json}, Req, State};
+websocket_info({timeout, _Ref, list_active_traces}, Req,
+        #?STATE{list_all_active_traces_poller_ref = _ } = State) ->
+    R = list_active_traces_poller(),
+    Json = active_traces_json(),
+    {reply, {text, Json}, Req, State#?STATE{list_all_active_traces_poller_ref = R}};
 websocket_info({timeout, _Ref, {<<"fetch">>, Count}}, Req, #?STATE{ polling = false } = State) ->
     Json = polling_end_json(),
     {reply, {text, Json}, Req, State};
@@ -91,7 +101,7 @@ poller(Ms, Count) when Count > 0 ->
     erlang:start_timer(Ms, self(), {<<"fetch">>, Count}).
 
 list_active_traces_poller() ->
-    LATPollerRef = erlang:start_timer(1000, self(), {<<"list_active_traces">>, Count}).
+    LATPollerRef = erlang:start_timer(1000, self(), <<"list_active_traces">>).
 
 ensure_info(T) ->
     crell_web_utils:ens_bin(io_lib:format("~p", [T])).
