@@ -3,6 +3,13 @@
     app.controller('CrellController', function($scope, $http){
 
 
+    // 320 is the trace menu,
+    // so screen_height - 320 - 50(padding)
+    // resize the trace table...>
+    // var wh = $(window).height() - 320 - 50;
+    // $('traces_div').height(wh);
+    // alert(wh);
+
     var url = window.location.href;
     var arr = url.split("/");
 
@@ -26,10 +33,15 @@
                 }
             } else if(json_data.hasOwnProperty('active_traces')) {
                 $('#trace_patterns').empty();
-                for(var i = 0; i < json_data['active_traces'].length; i++) {
-                    var obj = json_data['active_traces'][i];
-                    var mfastr = obj['module']+':'+obj['function']+'/'+obj['arity'];
-                    $('#trace_patterns').append('<option value='+mfastr+'>'+mfastr+'</option>');
+                if( json_data['active_traces'].length > 0 ){
+                    for(var i = 0; i < json_data['active_traces'].length; i++) {
+                        var obj = json_data['active_traces'][i];
+                        var mfastr = obj['module']+':'+obj['function']+'/'+obj['arity'];
+                        $('#trace_patterns').
+                            append('<option value='+mfastr+'>'+mfastr+'</option>');
+                    }
+                } else if ( json_data['active_traces'].length <= 0 ) {
+                    stop_polling();
                 }
             } else if(json_data.hasOwnProperty('functions')) {
                 $('#trace_func').empty();
@@ -114,13 +126,7 @@
                 $('#fetchSelect').attr("disabled", false);
                 $('#clearBtn').attr("disabled", false);
                 $('#printBtn').attr("disabled", false);
-                gws.send(JSON.stringify({
-                    'module':'goanna_api',
-                    'function':'list_active_traces',
-                    'args':
-                        []
-                    })
-                );
+                get_active_traces(),
                 ws.send(JSON.stringify({
                     'module':'crell_server',
                     'function':'cluster_modules',
@@ -181,8 +187,12 @@
     });
 
     $('#stoppollBtn').click(function(){
-        gws.send( JSON.stringify({"polling":"false"}) );
+        stop_polling();
     });
+
+    function stop_polling(){
+        gws.send( JSON.stringify({"polling":"false"}) );
+    }
 
     $('#fetchBtn').click(function(evt){
         // gws.send( JSON.stringify( {"fetch":$('#fetchSelect').val()} ));
@@ -309,6 +319,10 @@
         }
     });
 
+    $('#trace_pattern_refresh').click(function(){
+        get_active_traces();
+    });
+
     function disable_polling_input(){
         $('#pollBtn').attr("disabled", false);
         $('#stoppollBtn').attr("disabled", true);
@@ -331,6 +345,16 @@
         $('#trace_tim').empty();
         $('#trace_mes').empty();
         $('#trace_patterns').empty();
+    }
+
+    function get_active_traces(){
+        gws.send(JSON.stringify({
+            'module':'goanna_api',
+            'function':'list_active_traces',
+            'args':
+                []
+            })
+        );
     }
 
   });
