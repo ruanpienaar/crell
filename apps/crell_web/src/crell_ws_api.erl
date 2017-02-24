@@ -34,6 +34,8 @@ websocket_handle({text, ReqJson}, Req, State) ->
          {<<"args">>,[Node, Cookie]}] ->
             ok = crell_server:add_node(crell_web_utils:ens_atom(Node),
                                        crell_web_utils:ens_atom(Cookie)),
+            %% Hawk is currently configured to wait 1000ms ( 500ms sleep, 10 attempts )
+            erlang:start_timer(1050, self(), <<"nodes">>),
             {reply, reply_ok(), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"del_node">>},
@@ -115,6 +117,9 @@ websocket_info({crell_notify,
                                    Event == node_disconnected ->
     {reply, {text, jsx:encode([{crell_web_utils:ens_bin(Event),
                                 crell_web_utils:ens_bin(Node)}])}, Req, State};
+websocket_info({timeout, _Ref, <<"nodes">>}, Req, State) ->
+    NodesJson = nodes_json(),
+    {reply, {text, NodesJson}, Req, State};
 websocket_info(Info, Req, State) ->
     io:format("Info : ~p\n", [Info]),
     Json = <<"reply">>,
