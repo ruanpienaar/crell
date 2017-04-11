@@ -179,12 +179,16 @@
     }
 
     $('#pollBtn').click(function(){
+        start_polling();
+    });
+
+    function start_polling(){
         $('#pollBtn').attr("disabled", true);
         $('#stoppollBtn').attr("disabled", false);
         $('#loaderImg').attr("class", "visible");
         $('#fetchBtn').attr("disabled", true);
         gws.send( JSON.stringify({"polling":"true"}) );
-    });
+    }
 
     $('#stoppollBtn').click(function(){
         stop_polling();
@@ -206,6 +210,7 @@
     });
 
     $('#traceBtn').click(function(evt){
+        start_polling();
         gws.send(JSON.stringify({'module':'goanna_api',
                                  'function':'trace',
                                  'args':

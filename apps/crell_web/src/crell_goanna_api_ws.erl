@@ -12,16 +12,13 @@
 
 
 init(Req, Opts) ->
-    % erlang:register(crell_goanna_api_ws, self()),
     process_flag(trap_exit, true),
-    % io:format("Opts : ~p~n", [Opts]),
     {cowboy_websocket, Req, #?STATE{}}.
 
 websocket_handle({text, ReqJson}, Req, State) ->
-    % io:format("State : ~p~n", [State]),
     case jsx:decode(ReqJson) of
         [{<<"polling">>,<<"true">>}] ->
-            poller(100, 100),
+            poller(100),
             {reply, {text, <<"ok">>}, Req, State#?STATE{ polling = true }};
         [{<<"polling">>,<<"false">>}] ->
             {reply, {text, <<"ok">>}, Req, State#?STATE{ polling = false }};
@@ -34,16 +31,9 @@ websocket_handle({text, ReqJson}, Req, State) ->
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"trace">>},
          {<<"args">>,[Mod,FuncAndAra,TimeSeconds,Messages]}] ->
-
-            %% Currently the polling moves around the Select, which is not ideal...
-            % R = list_active_traces_poller(),
-            % ok = trace(Mod,FuncAndAra,TimeSeconds,Messages),
-            % Json = active_traces_json(),
-            % {reply, {text, Json}, Req, State#?STATE{list_all_active_traces_poller_ref = R}};
             ok = trace(Mod,FuncAndAra,TimeSeconds,Messages),
             Json = active_traces_json(),
             {reply, {text, Json}, Req, State};
-
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[]}] ->
@@ -86,17 +76,16 @@ websocket_info({timeout, _Ref, <<"list_active_traces">>}, Req,
             R = list_active_traces_poller(),
             {reply, {text, Json}, Req, State#?STATE{list_all_active_traces_poller_ref = R}}
     end;
-websocket_info({timeout, _Ref, {<<"fetch">>, Count}}, Req, #?STATE{ polling = false } = State) ->
+websocket_info({timeout, _Ref, {<<"fetch">>,_}}, Req, #?STATE{ polling = false } = State) ->
     Json = polling_end_json(),
     {reply, {text, Json}, Req, State};
-websocket_info({timeout, _Ref, {<<"fetch">>, Count}}, Req, #?STATE{ polling = true } = State) ->
-    NewCount = Count - 1,
+websocket_info({timeout, _Ref, {<<"fetch">>, Ms}}, Req, #?STATE{ polling = true } = State) ->
     Json =
-        case NewCount of
-            0 ->
+        case goanna_api:list_active_traces() of
+            [] ->
                 polling_end_json();
-            _ ->
-                poller(500, Count-1),
+            _Else ->
+                poller(Ms),
                 all_traces_json()
         end,
     {reply, {text, Json}, Req, State};
@@ -104,10 +93,13 @@ websocket_info(Info, Req, State) ->
     io:format("~p~n", [Info]),
     {ok, Req, State}.
 
-poller(Ms, Count) when Count =< 0 ->
-    ok;
-poller(Ms, Count) when Count > 0 ->
-    erlang:start_timer(Ms, self(), {<<"fetch">>, Count}).
+poller(Ms) ->
+    erlang:start_timer(Ms, self(), {<<"fetch">>, Ms}).
+
+% poller(Ms, Count) when Count =< 0 ->
+%     ok;
+% poller(Ms, Count) when Count > 0 ->
+%     erlang:start_timer(Ms, self(), {<<"fetch">>, Count}).
 
 list_active_traces_poller() ->
     LATPollerRef = erlang:start_timer(1000, self(), <<"list_active_traces">>).
