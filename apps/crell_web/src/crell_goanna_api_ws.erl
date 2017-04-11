@@ -150,10 +150,10 @@ dbg_trace_format_to_json({Now, {drop, NumDropped}}) ->
      {<<"dropped">>, crell_web_utils:ens_bin(NumDropped)}].
 
 trace(BinMod,<<"*">>,BinTimeSeconds,BinMessages) ->
-    ok = goanna_api:trc(binary_to_list(BinMod)++" -> return ",
+    ok = goanna_api:trace_ms(binary_to_list(BinMod)++" -> return ",
         trace_opts(BinTimeSeconds,BinMessages));
 trace(BinMod,BinFunc,BinTimeSeconds,BinMessages) ->
-    ok = goanna_api:trc(binary_to_list(BinMod)++":"++binary_to_list(BinFunc)++" -> return ",
+    ok = goanna_api:trace_ms(binary_to_list(BinMod)++":"++binary_to_list(BinFunc)++" -> return ",
         trace_opts(BinTimeSeconds,BinMessages)).
 
 trace_opts(<<"">>,<<"">>) ->
