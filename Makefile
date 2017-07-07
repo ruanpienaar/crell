@@ -1,35 +1,19 @@
-.PHONY: rel compile get-deps update-deps test clean deep-clean
+.PHONY: release compile test clean dialyzer rebar3
 
-rel: compile
-	@rebar generate -f
+release: compile
+	@./rebar3 release
 
-compile: get-deps update-deps
-	@rebar compile
+compile: rebar3
+	@./rebar3 compile
 
-get-deps:
-	@rebar get-deps
-
-update-deps:
-	@rebar update-deps
+test:
+	@./rebar3 eunit ct
 
 clean:
-	@rebar clean
-
-deep-clean: clean
-	@rebar delete-deps
-
-setup_dialyzer:
-	dialyzer --build_plt --apps erts kernel stdlib runtime_tools syntax_tools deps/*/ebin ./ebin
-	dialyzer --add_to_plt ebin
+	@./rebar3 clean
 
 dialyzer: compile
-	dialyzer ebin
+	@./rebar3 dialyzer
 
-analyze: checkplt
-	@rebar skip_deps=true dialyze
-
-buildplt: setup_dialyzer
-	@rebar skip_deps=true build-plt
-
-checkplt: buildplt
-	@rebar skip_deps=true check-plt
+rebar3:
+	@ls rebar3 || wget https://s3.amazonaws.com/rebar3/rebar3 && chmod +x rebar3
