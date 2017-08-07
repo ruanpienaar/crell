@@ -1,8 +1,10 @@
 -module(crell_ws_api).
 
--export([init/2]).
--export([websocket_handle/3]).
--export([websocket_info/3]).
+% -export([init/2]).
+% -export([websocket_handle/3]).
+% -export([websocket_info/3]).
+
+-compile(export_all).
 
 -define(STATE, crell_ws_api).
 -record(?STATE, { }).
@@ -82,6 +84,17 @@ websocket_handle({text, ReqJson}, Req, State) ->
             ),
             ModsFuncJson = mod_funcs_json(ModsFuncs, []),
             {reply, {text, ModsFuncJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"calc_app_env">>},
+         {<<"args">>,[Node, AppName]}] ->
+            AppEnvJson = app_env_json(
+                AppName,
+                crell_server:calc_app_env(
+                    crell_web_utils:ens_atom(Node),
+                    crell_web_utils:ens_atom(AppName)
+                )
+            ), 
+            {reply, {text, AppEnvJson}, Req, State};
         UnknownJson ->
             io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
@@ -169,3 +182,30 @@ mod_funcs_json([], R) ->
 mod_funcs_json([{Mod,Ara}|T] , R) ->
     % mod_funcs_json(T, [list_to_binary(atom_to_list(H))|R]).
     mod_funcs_json(T, [list_to_binary(io_lib:format("~p/~p",[Mod,Ara]))|R]).
+
+app_env_json(AppName, AppEnv) ->
+
+    jsx:encode([{<<"app_name">>, crell_web_utils:ens_bin(AppName)},
+                {<<"app_envs">>, crell_web_utils:ens_bin(
+                    io_lib:format("~p", [AppEnv])
+                 )}
+               ]).
+
+%     % [{logsettings,[{wrapcount,500},
+%     %            {wrapsize,1000000},
+%     %            {timestamp_format,"%Y-%m-%dT%H:%M:%S.%N,"},
+%     %            {wraptime,3600},
+%     %            {logdir,"logs/audit"}]},
+%     %  {included_applications,[]}]
+%     app_env_json(AppName, AppEnv, []).
+
+% app_env_json(AppName, [], R) ->
+%     jsx:encode([{<<"app_name">>, crell_web_utils:ens_bin(AppName)},
+%                 {<<"app_envs">>, lists:reverse(R)}
+%                ]);
+% app_env_json(AppName, [{K,V} | T], R) ->
+%     app_env_json(AppName, T, [{crell_web_utils:ens_bin(K), crell_web_utils:ens_bin(V)} | R]);
+% app_env_json(AppName, [H|T], R) ->
+%     app_env_json(AppName, T, [H | R]).
+
+    

@@ -1,22 +1,22 @@
 .PHONY: rel compile get-deps update-deps test clean deep-clean
 
 rel: compile
-	@rebar generate -f
+	@./rebar generate -f
 
 compile: get-deps update-deps
-	@rebar compile
+	@./rebar compile
 
 get-deps:
-	@rebar get-deps
+	@./rebar get-deps
 
 update-deps:
-	@rebar update-deps
+	@./rebar update-deps
 
 clean:
-	@rebar clean
+	@./rebar clean
 
 deep-clean: clean
-	@rebar delete-deps
+	@./rebar delete-deps
 
 setup_dialyzer:
 	dialyzer --build_plt --apps erts kernel stdlib runtime_tools syntax_tools deps/*/ebin ./ebin
@@ -26,10 +26,10 @@ dialyzer: compile
 	dialyzer ebin
 
 analyze: checkplt
-	@rebar skip_deps=true dialyze
+	@./rebar skip_deps=true dialyze
 
 buildplt: setup_dialyzer
-	@rebar skip_deps=true build-plt
+	@./rebar skip_deps=true build-plt
 
 checkplt: buildplt
-	@rebar skip_deps=true check-plt
+	@./rebar skip_deps=true check-plt
