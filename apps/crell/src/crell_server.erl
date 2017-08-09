@@ -28,7 +28,8 @@
     calc_proc/3,
     calc_app_env/2,
     remote_which_applications/1,
-    make_xref/1
+    make_xref/1,
+    get_db_info/2
 ]).
 
 -export([
@@ -123,6 +124,11 @@ remote_which_applications(Node) ->
 %% This is to follow a function to another....
 make_xref(_Node) ->
     ok.
+
+get_db_info(Node, ets) ->
+    gen_server:call({get_db_info, ets});
+get_db_info(Node, mnesia) ->
+    gen_server:call({get_db_info, mnesia}).
 
 is_tracing() ->
     gen_server:call(?MODULE, is_tracing).
@@ -266,10 +272,26 @@ handle_call(cluster_application_consistency, _From, State) ->
             {ok, Reply, UpdatedState} = update_state(Node, State, remote_which_applications),
             {[Reply|Replies], UpdatedState}
         end, {[], State}, State#?STATE.nodes),
+    % io:format("~p~n", [NodeReplies]),
+    {reply, ok, NewState};
+handle_call({get_db_info, ets}, _From, State) ->
+%     (test@rpmbp)5> ets:all().
+% [ac_tab,#Ref<0.548493861.2915958785.141345>,
+%  #Ref<0.548493861.2915958785.141346>,global_locks,
+%  global_names,global_names_ext,global_pid_names,
+%  global_pid_ids,inet_db,inet_cache,inet_hosts_byname,
+%  inet_hosts_byaddr,inet_hosts_file_byname,
+%  inet_hosts_file_byaddr,#Ref<0.548493861.2915958785.141442>,
+%  sys_dist,file_io_servers,
+%  #Ref<0.548493861.2915958785.141546>,wx_debug_info,
+%  wx_non_consts,#Ref<0.548493861.2915958785.141662>,
+%  #Ref<0.548493861.2915958785.141663>,timer_tab,
+%  timer_interval_tab]
+% (test@rpmbp)6>
+    {reply, ok, State};
+handle_call({get_db_info, mnesia}, _From, State) ->
+    {reply, ok, State}.
 
-    io:format("~p~n", [NodeReplies]),
-
-    {reply, ok, NewState}.
 %% --------------------------------------------------------------------------
 % handle_cast({node_connected, Node, Cookie}, State) ->
 %     {noreply, add_node(Node, Cookie, State)};
