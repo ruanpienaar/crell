@@ -3,15 +3,15 @@
   {description, ""},
   {vsn, "1"},
   {registered, []},
-  {applications, [
-                  kernel,
+  {applications, [kernel,
                   stdlib,
+                  sasl,
                   ranch,
                   cowlib,
                   cowboy,
-                  jsx,
-                  crell_crawl,
-                  goanna
+                  jiffy,
+                  goanna,
+                  crell_crawl
                  ]},
   {mod, { crell_app, []}},
   {env, []}

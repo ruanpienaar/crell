@@ -1,0 +1,2 @@
+- code:load_binary needs crell, and the remote nodes to have to same mayor version of OTP installed ( fix / find a solution )
+- basic javascript input validation.

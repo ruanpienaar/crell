@@ -40,6 +40,10 @@
          purge_module/2
 ]).
 
+-export([
+    cluster_application_consistency/0
+]).
+
 %% TODO: choose a better data structure, or use ets...
 %% The orddict, is not coping with the amounts of data from the module function exports...
 
@@ -126,13 +130,16 @@ is_tracing() ->
 toggle_tracing() ->
     gen_server:call(?MODULE, toggle_tracing).
 
+cluster_application_consistency() ->
+    gen_server:call(?MODULE, cluster_application_consistency).
+
 %% ---------------------------------------
 
 init({}) ->
     process_flag(trap_exit, true),
     {ok, #?STATE{}}.
 
-node_ordict_values(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
+update_state(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
     case orddict:find(Node, Nodes) of
         {ok, RemoteState} ->
             {ok, Response, UpdatedRemoteState} = do_get_values(Node, RemoteState, LookupValue),
@@ -174,11 +181,10 @@ do_get_values(Node, RemoteState, remote_which_applications) ->
     {ok, RemoteApps, RemoteState2}.
 
 handle_call(nodes, _From, State) ->
-    Nodes = orddict:fetch_keys(State#?STATE.nodes),
-    {reply, Nodes, State};
+    {reply, state_nodes(State), State};
 handle_call({runtime_modules, Node}, _From, State) ->
     % Update state here
-    {ok, Reply, NewState} = node_ordict_values(Node, State, get_remote_modules),
+    {ok, Reply, NewState} = update_state(Node, State, get_remote_modules),
     {reply, Reply, NewState};
 
 
@@ -189,23 +195,22 @@ handle_call(cluster_modules, _From, State) ->
 
     %% TODO: hack, just use the last Node's modules...
     LastNode = lists:last(orddict:fetch_keys(State#?STATE.nodes)),
-    {ok, Reply, NewState} = node_ordict_values(LastNode, State, get_remote_modules),
+    {ok, Reply, NewState} = update_state(LastNode, State, get_remote_modules),
 
-    {reply, Reply, State};
+    {reply, Reply, NewState};
 handle_call({cluster_module_functions,Mod}, _From, State) ->
     %% TODO: hack, just use the last Node's modules...
     LastNode = lists:last(orddict:fetch_keys(State#?STATE.nodes)),
-    {ok, Reply, NewState} = node_ordict_values(LastNode, State, {get_remote_module_functions,Mod}),
+    {ok, Reply, NewState} = update_state(LastNode, State, {get_remote_module_functions,Mod}),
     {reply, Reply, NewState};
 % handle_call({runtime_module_functions, Node, Mod}, _From, State) ->
 %     % Update state here
-%     {ok, Reply, _} = node_ordict_values(Node, State, {get_remote_module_functions, Mod}),
+%     {ok, Reply, _} = update_state(Node, State, {get_remote_module_functions, Mod}),
 %     {reply, Reply, State};
-
 
 handle_call({non_sys_processes, Node}, _From, State) ->
     % Update state here
-    {ok, Reply, _} = node_ordict_values(Node, State, non_sys_processes),
+    {ok, Reply, _} = update_state(Node, State, non_sys_processes),
     {reply, Reply, State};
 handle_call({app, Node, App, Opts}, _From, State) ->
     % Update state here
@@ -213,7 +218,7 @@ handle_call({app, Node, App, Opts}, _From, State) ->
     {reply, R, State};
 handle_call({app_env, Node, AppName}, _From, State) ->
     % Update state here
-    {ok, Reply, NewState} = node_ordict_values(Node, State, {app_env, AppName}),
+    {ok, Reply, NewState} = update_state(Node, State, {app_env, AppName}),
     {reply, Reply, NewState};
 handle_call({pid, Node, Pid}, _From, State) ->
     % Update state here
@@ -221,11 +226,7 @@ handle_call({pid, Node, Pid}, _From, State) ->
     {reply, R, State};
     %% TODO: also build a all app env....
 handle_call({remote_which_applications, Node}, _From, State) ->
-    % Update state here
-    % {ok, RemoteState} = start_remote_code(Node, Cookie),
-    % State#?STATE{ nodes = orddict:store(Node, RemoteState, N) }.
-    %{ok, RemoteState} = remote_state(),
-    {ok, Reply, _} = node_ordict_values(Node, State, remote_which_applications),
+    {ok, Reply, _} = update_state(Node, State, remote_which_applications),
     {reply, Reply, State};
 handle_call(E={node_connected, Node, Cookie}, _From, State) ->
     crell_notify:action({node_connecting, Node}),
@@ -258,8 +259,17 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
     end, ok, State#?STATE.nodes),
     {reply, true, State#?STATE{ tracing = true }};
 
-handle_call(Request, _From, State) ->
-    {reply, {error, unknown_call, ?MODULE, Request}, State}.
+handle_call(cluster_application_consistency, _From, State) ->
+    {NodeReplies, NewState} =
+        orddict:fold(fun(Node, _Value, {Replies, State}) ->
+
+            {ok, Reply, UpdatedState} = update_state(Node, State, remote_which_applications),
+            {[Reply|Replies], UpdatedState}
+        end, {[], State}, State#?STATE.nodes),
+
+    io:format("~p~n", [NodeReplies]),
+
+    {reply, ok, NewState}.
 %% --------------------------------------------------------------------------
 % handle_cast({node_connected, Node, Cookie}, State) ->
 %     {noreply, add_node(Node, Cookie, State)};
@@ -403,3 +413,6 @@ fun_src(Mod, Fun, Arity) ->
 %         catch _:E ->
 %                 {error, E}
 %         end.
+
+state_nodes(State) ->
+    orddict:fetch_keys(State#?STATE.nodes).

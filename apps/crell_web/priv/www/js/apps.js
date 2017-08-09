@@ -40,6 +40,7 @@
                 // get the first Node's apps'
                 if(json_data.nodes.length>0){
                     get_application(json_data.nodes[0]);
+                    check_cluster_application_consistency();
                 }
             }
         } else if (json_data.hasOwnProperty('node_apps')) {
@@ -50,36 +51,33 @@
                     napp.name+'</td><td>'+
                     napp.erts_vsn+'</td><td>'+
                     napp.vsn+'</td><td>'+
-                    // '<button onclick="get_app_env(\''+napp.name+'\')">Get App Env</button></td></tr>');
-
                     '<button onclick="get_app_env(\''+napp.name+'\')">Get App Env</button></td>'+
-                    '<td id="'+napp.name+'">&nbsp;</td></tr>');
+                    '<td id="'+napp.name+'">&nbsp;</td></tr>'
+                );
             }
         } else if (json_data.hasOwnProperty('app_envs')) {
             var a = json_data.app_name;
-            alert(a);
             $('#'+a).empty();
             $('#'+a).append(json_data.app_envs);
         }
     }
 
     function get_application(node){
-        ws.send(JSON.stringify({'module':'crell_server',
-                                'function':'remote_which_applications',
-                                'args':
-                                    [node]
-                               })
-        );
+        ws.send(JSON.stringify({
+            'module':'crell_server',
+            'function':'remote_which_applications',
+            'args':
+                [node]
+        }));
     };
 
-    // function get_app_env(app_name){
-    //     ws.send(JSON.stringify({'module':'crell_server',
-    //                             'function':'calc_app_env',
-    //                             'args':
-    //                                 [$('#nodes').val(), app_name]
-    //                            })
-    //     );
-    // }
+    function check_cluster_application_consistency(){
+        ws.send(JSON.stringify({
+            'module':'crell_server',
+            'function':'cluster_application_consistency',
+            'args': []
+        }));
+    }
 
     $('#nodes').change(function(){
         get_application($('#nodes').val());
