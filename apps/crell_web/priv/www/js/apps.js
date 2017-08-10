@@ -3,7 +3,7 @@
     app.controller('CrellController', function($scope, $http){
 
     $scope.nodes = {};
-    $scope.app_name = {}; 
+    $scope.app_name = {};
 
     var url = window.location.href;
     var arr = url.split("/");

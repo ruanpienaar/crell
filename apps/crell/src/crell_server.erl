@@ -29,7 +29,7 @@
     calc_app_env/2,
     remote_which_applications/1,
     make_xref/1,
-    get_db_info/2
+    get_db_tables/1
 ]).
 
 -export([
@@ -125,10 +125,8 @@ remote_which_applications(Node) ->
 make_xref(_Node) ->
     ok.
 
-get_db_info(Node, ets) ->
-    gen_server:call({get_db_info, ets});
-get_db_info(Node, mnesia) ->
-    gen_server:call({get_db_info, mnesia}).
+get_db_tables(Node) ->
+    gen_server:call(?MODULE, {get_db_tables, Node}).
 
 is_tracing() ->
     gen_server:call(?MODULE, is_tracing).
@@ -274,23 +272,9 @@ handle_call(cluster_application_consistency, _From, State) ->
         end, {[], State}, State#?STATE.nodes),
     % io:format("~p~n", [NodeReplies]),
     {reply, ok, NewState};
-handle_call({get_db_info, ets}, _From, State) ->
-%     (test@rpmbp)5> ets:all().
-% [ac_tab,#Ref<0.548493861.2915958785.141345>,
-%  #Ref<0.548493861.2915958785.141346>,global_locks,
-%  global_names,global_names_ext,global_pid_names,
-%  global_pid_ids,inet_db,inet_cache,inet_hosts_byname,
-%  inet_hosts_byaddr,inet_hosts_file_byname,
-%  inet_hosts_file_byaddr,#Ref<0.548493861.2915958785.141442>,
-%  sys_dist,file_io_servers,
-%  #Ref<0.548493861.2915958785.141546>,wx_debug_info,
-%  wx_non_consts,#Ref<0.548493861.2915958785.141662>,
-%  #Ref<0.548493861.2915958785.141663>,timer_tab,
-%  timer_interval_tab]
-% (test@rpmbp)6>
-    {reply, ok, State};
-handle_call({get_db_info, mnesia}, _From, State) ->
-    {reply, ok, State}.
+handle_call({get_db_tables, Node}, _From, State) ->
+    Res = rpc:call(Node, crell_remote, get_db_tables, []),
+    {reply, Res, State}.
 
 %% --------------------------------------------------------------------------
 % handle_cast({node_connected, Node, Cookie}, State) ->

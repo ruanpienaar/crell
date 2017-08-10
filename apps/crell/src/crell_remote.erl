@@ -9,7 +9,8 @@
     calc_app_tree/2,
     calc_proc_tree/2,
     non_sys_processes/0,
-    get_app_env/0
+    get_app_env/0,
+    get_db_tables/0
 ]).
 %%----------------------------------------------------------------------
 
@@ -449,3 +450,155 @@ get_app_env() ->
 
 get_app_env(RRAs) ->
     [{App, application:get_all_env(App)} || {App,_,_} <- RRAs ].
+
+
+get_db_tables() ->
+    ETbls = [{ets, tables(ets)}],
+    MTbls =
+        case whereis(mnesia_tm) of
+            undefined ->
+                [];
+            _Pid ->
+                [{mnesia, tables(mnesia)}]
+        end,
+    ETbls++MTbls.
+
+%% COPIED FROM observer_backend.erl ( from runtime_tools )
+tables(ets) ->
+    Opts = [{unread_hidden, false},
+            {sys_hidden, false}
+    ],
+    HideUnread = proplists:get_value(unread_hidden, Opts, true),
+    HideSys = proplists:get_value(sys_hidden, Opts, true),
+    Fun = fun(Id, Acc) ->
+        try
+            TabId =
+                case ets:info(Id, named_table) of
+                    true -> ignore;
+                    false -> Id
+                end,
+            Name = ets:info(Id, name),
+            Protection = ets:info(Id, protection),
+            ignore(HideUnread andalso Protection == private, unreadable),
+            Owner = ets:info(Id, owner),
+            RegName =
+                case catch process_info(Owner, registered_name) of
+                    [] -> ignore;
+                    {registered_name, ProcName} -> ProcName
+                end,
+            ignore(HideSys andalso ordsets:is_element(RegName, sys_processes()), system_tab),
+            ignore(HideSys andalso ordsets:is_element(Name, sys_tables()), system_tab),
+            ignore((RegName == mnesia_monitor)
+            andalso Name /= schema
+            andalso is_atom((catch mnesia:table_info(Name, where_to_read))), mnesia_tab),
+            Memory = ets:info(Id, memory) * erlang:system_info(wordsize),
+            Tab = [{name,Name},
+                   {id,TabId},
+                   {protection,Protection},
+                   {owner,Owner},
+                   {size,ets:info(Id, size)},
+                   {reg_name,RegName},
+                   {type,ets:info(Id, type)},
+                   {keypos,ets:info(Id, keypos)},
+                   {heir,ets:info(Id, heir)},
+                   {memory,Memory},
+                   {compressed,ets:info(Id, compressed)},
+                   {fixed,ets:info(Id, fixed)}
+                  ],
+            [Tab|Acc]
+        catch _:_What ->
+            Acc
+        end
+    end,
+    lists:foldl(Fun, [], ets:all());
+tables(mnesia) ->
+    Opts = [{sys_hidden, false}
+    ],
+    HideSys = proplists:get_value(sys_hidden, Opts, true),
+    Owner = ets:info(schema, owner),
+    Owner /= undefined orelse
+    throw({error, "Mnesia is not running on: " ++ atom_to_list(node())}),
+    {registered_name, RegName} = process_info(Owner, registered_name),
+    Fun = fun(Id, Acc) ->
+        try
+            Name = Id,
+            ignore(HideSys andalso ordsets:is_element(Name, mnesia_tables()), system_tab),
+            ignore(Name =:= schema, mnesia_tab),
+            Storage = mnesia:table_info(Id, storage_type),
+            Tab0 = [{name,Name},
+                    {owner,Owner},
+                    {size,mnesia:table_info(Id, size)},
+                    {reg_name,RegName},
+                    {type,mnesia:table_info(Id, type)},
+                    {keypos,2},
+                    {memory,mnesia:table_info(Id, memory) * erlang:system_info(wordsize)},
+                    {storage,Storage},
+                    {index,mnesia:table_info(Id, index)}
+                   ],
+            Tab =
+                if Storage == disc_only_copies ->
+                    [{fixed, dets:info(Id, safe_fixed)}|Tab0];
+                   (Storage == ram_copies) orelse (Storage == disc_copies) ->
+                    [{fixed, ets:info(Id, fixed)},
+                     {compressed, ets:info(Id, compressed)}|Tab0];
+                true ->
+                    Tab0
+                end,
+            [Tab|Acc]
+        catch _:_What ->
+            Acc
+        end
+    end,
+    lists:foldl(Fun, [], mnesia:system_info(tables)).
+
+ignore(true, Reason) -> throw(Reason);
+ignore(_,_ ) -> ok.
+
+sys_tables() ->
+    [ac_tab,  asn1,
+     cdv_dump_index_table,  cdv_menu_table,  cdv_decode_heap_table,
+     cell_id,  cell_pos,  clist,
+     cover_internal_data_table,   cover_collected_remote_data_table, cover_binary_code_table,
+     code, code_names,  cookies,
+     corba_policy,  corba_policy_associations,
+     dets, dets_owners, dets_registry,
+     disk_log_names, disk_log_pids,
+     eprof,  erl_atom_cache, erl_epmd_nodes,
+     etop_accum_tab,  etop_tr,
+     ets_coverage_data,
+     file_io_servers,
+     gs_mapping, gs_names,  gstk_db,
+     gstk_grid_cellid, gstk_grid_cellpos, gstk_grid_id,
+     httpd,
+     id,
+     ign_req_index, ign_requests,
+     index,
+     inet_cache, inet_db, inet_hosts,
+     'InitialReferences',
+     int_db,
+     interpreter_includedirs_macros,
+     ir_WstringDef,
+     lmcounter,  locks,
+                        %     mnesia_decision,
+     mnesia_gvar, mnesia_stats,
+                        %     mnesia_transient_decision,
+     pg2_table,
+     queue,
+     schema,
+     shell_records,
+     snmp_agent_table, snmp_local_db2, snmp_mib_data, snmp_note_store, snmp_symbolic_ets,
+     tkFun, tkLink, tkPriv,
+     ttb, ttb_history_table,
+     udp_fds, udp_pids
+    ].
+
+mnesia_tables() ->
+    [ir_AliasDef, ir_ArrayDef, ir_AttributeDef, ir_ConstantDef,
+     ir_Contained, ir_Container, ir_EnumDef, ir_ExceptionDef,
+     ir_IDLType, ir_IRObject, ir_InterfaceDef, ir_ModuleDef,
+     ir_ORB, ir_OperationDef, ir_PrimitiveDef, ir_Repository,
+     ir_SequenceDef, ir_StringDef, ir_StructDef, ir_TypedefDef,
+     ir_UnionDef, logTable, logTransferTable, mesh_meas,
+     mesh_type, mnesia_clist, orber_CosNaming,
+     orber_objkeys, user
+    ].

@@ -33,36 +33,26 @@
           </div>
 
         <div class="container-fluid">
-
-            <h2>Database</h2>
-
+            <h2>OTP Databases</h2>
             <div class="form-inline">
-                <p>Existing nodes <select class="form-control" id="nodes"></select></p>
-
                 <p>
-                    Database Type:
-                    <select class="form-control" id="db_type">
-                        <option>ETS</option>
-                        <option>MNESIA</option>
-                    </select>
-                    <button>Show</button>
+                    Existing nodes <select class="form-control" id="nodes"></select>
+                    <button id="get_db_tables">Get Tables</button>
                 </p>
-
             </div>
-
-            <!-- <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                    <thead>
-                        <tr>
-                            <th>Module</th>
-                        </tr>
-                    </thead>
-                    <tbody id="mods_table"></tbody>
+            <div class="table-responsive">
+                <p><h3>Ets</h3></p>
+                <table id="ets_db_tables" class="table table-bordered table-striped">
+                    <thead>Name</thead>
                 </table>
-            </div> -->
-
+            </div>
+            <div class="table-responsive">
+                <p><h3>Mnesia</h3></p>
+                <table id="mnesia_db_tables" class="table table-bordered table-striped">
+                    <thead>Name</thead>
+                </table>
+            </div>
         </div>
-
        </div>
     </body>
 </html>

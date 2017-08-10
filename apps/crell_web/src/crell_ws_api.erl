@@ -85,9 +85,17 @@ websocket_handle({text, ReqJson}, Req, State) ->
                     crell_web_utils:ens_atom(Node),
                     crell_web_utils:ens_atom(AppName)
                 )
-            ), 
+            ),
             {reply, {text, AppEnvJson}, Req, State};
-	[{<<"module">>,<<"crell_server">>},
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"get_db_tables">>},
+         {<<"args">>,[Node]}] ->
+            DbTypeTables =
+                crell_server:get_db_tables(
+                    crell_web_utils:ens_atom(Node)
+                ),
+            {reply, {text, db_info_json(DbTypeTables)}, Req, State};
+    	[{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_application_consistency">>},
          {<<"args">>,[]}] ->
             _ConsistencyResponse = crell_server:cluster_application_consistency(),
@@ -141,7 +149,7 @@ get_node_apps_json(Node) ->
                     , {<<"vsn">>, crell_web_utils:ens_bin(Vsn)}
                     ] || {AppName, ErtsVsn, Vsn} <- NodeApps],
     jsx:encode([{<<"node_apps">>, NodeAppsJson}]).
-    
+
 pids_json(Pids) ->
     pids_json(Pids, []).
 
@@ -173,3 +181,59 @@ app_env_json(AppName, AppEnv) ->
                     io_lib:format("~p", [AppEnv])
                  )}
                ]).
+
+db_info_json(Tables) ->
+    jsx:encode([
+        {<<"db_tables">>, db_info_json(Tables, [])}
+    ]).
+
+db_info_json([], R) ->
+    R;
+db_info_json([{ets, EtsTables} | DbTypeTables], R) ->
+    % name is enough for now...
+    EtsTblNames =
+        lists:map(fun(TableProplist) ->
+            % io:format("TBL:~p~n~n", [TableProplist]),
+            {name, Name} = lists:keyfind(name, 1, TableProplist),
+            Name
+        end, EtsTables),
+    db_info_json(DbTypeTables, [{<<"ets_tables">>, EtsTblNames} | R]);
+db_info_json([{mnesia, []} | DbTypeTables], R) ->
+    db_info_json(DbTypeTables, R);
+db_info_json([{mnesia, MnesiaTables} | DbTypeTables], R) ->
+    % name is enough for now...
+    MnesiaTblNames =
+        lists:map(fun(TableProplist) ->
+            % io:format("TBL:~p~n~n", [TableProplist]),
+            {name, Name} = lists:keyfind(name, 1, TableProplist),
+            Name
+        end, MnesiaTables),
+    db_info_json(DbTypeTables, [{<<"mnesia_tables">>, MnesiaTblNames} | R]).
+
+% [{ets, tables(ets)},
+%  {mnesia, tables(mnesia)}
+% ]
+
+% [{ets,[[{name,mnesia_decision},
+%         {id,ignore},
+%         {protection,public},
+%         {owner,<23945.153.0>},
+%         {size,1},
+%         {reg_name,mnesia_recover},
+%         {type,set},
+%         {keypos,2},
+%         {heir,none},
+%         {memory,2512},
+%         {compressed,false},
+%         {fixed,false}],
+
+% [{mnesia, [[[{name,Name},
+            %  {owner,Owner},
+            %  {size,mnesia:table_info(Id, size)},
+            %  {reg_name,RegName},
+            %  {type,mnesia:table_info(Id, type)},
+            %  {keypos,2},
+            %  {memory,mnesia:table_info(Id, memory) * erlang:system_info(wordsize)},
+            %  {storage,Storage},
+            %  {index,mnesia:table_info(Id, index)}
+            % ],
