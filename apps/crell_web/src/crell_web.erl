@@ -11,20 +11,20 @@ start_link() ->
     start().
 
 start() ->
-    {ok,Port} = port(),
+    {ok, Port} = port(),
     io:format("......\nStarting cowboy on ~p\n......\n",[Port]),
-    Dispatch  = cowboy_router:compile( routes() ),
+    Dispatch  = cowboy_router:compile( routes() ),    
     {ok, Pid} = cowboy:start_http(?COWBOY_REF,
-                                _ConnectionPoolSize=10,
-                                [{port, Port}],
-                                [{env, [{dispatch, Dispatch}]},
-                                 {max_keepalive, 50},
-                                 %% {onrequest, fun timely_session:on_request/1},
-                                 {timeout, 500}
-                                ]
-                               ),
-    io:format("Pid : ~p\n", [Pid]),
-    {ok,Pid}.
+                                 _ConnectionPoolSize=10,
+                                 [{port, Port}],
+                                 [{env, [{dispatch, Dispatch}]},
+                                  {max_keepalive, 50},
+                                  %% {onrequest, fun timely_session:on_request/1},
+                                  {timeout, 500}
+                                 ]
+                                ),
+    io:format("Cowboy Pid : ~p\n", [Pid]),
+    {ok, Pid}.
 
 routes() ->
     [

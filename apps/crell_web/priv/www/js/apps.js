@@ -96,7 +96,6 @@
 })();
 
 var app_name;
-
 function get_app_env(app_name) {
     angular.element(document.getElementsByTagName('body')).scope().get_app_env(app_name);
 }

@@ -53,6 +53,14 @@
     }
 
     $('#save_node').click(function(){
+        save_node();
+    });
+
+    $scope.save_node = function(){
+        save_node();
+    }
+
+    function save_node(){
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'add_node',
                                 'args':
@@ -62,7 +70,7 @@
         );
         $('#node').val("");
         $('#cookie').val("");
-    });
+    }
 
     $('#del_node').click(function(){
         if ( confirm("Remove node "+$('#nodes').val()+" ?") ){
@@ -81,3 +89,10 @@
 
   });
 })();
+
+$(document).keypress(function(e) {
+    if(e.which == 13) {
+        //alert('You pressed enter!');
+        angular.element(document.getElementsByTagName('body')).scope().save_node();
+    }
+});
