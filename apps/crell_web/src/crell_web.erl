@@ -13,7 +13,7 @@ start_link() ->
 start() ->
     {ok, Port} = port(),
     io:format("......\nStarting cowboy on ~p\n......\n",[Port]),
-    Dispatch  = cowboy_router:compile( routes() ),    
+    Dispatch  = cowboy_router:compile( routes() ),
     {ok, Pid} = cowboy:start_http(?COWBOY_REF,
                                  _ConnectionPoolSize=10,
                                  [{port, Port}],
@@ -55,6 +55,8 @@ routes() ->
             {"/goanna_api/ws", crell_goanna_api_ws, []},
             {"/crell/ws", crell_ws_api, []},
 
+            %% Download files from tmp
+            {"/dl/[...]", cowboy_static, {dir, "/tmp/crell_dl"}},
             {"/[...]", cowboy_static, {priv_dir, crell_web, "/www"}}
         ]
      }

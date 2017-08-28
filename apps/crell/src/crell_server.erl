@@ -29,7 +29,8 @@
     calc_app_env/2,
     remote_which_applications/1,
     make_xref/1,
-    get_db_tables/1
+    get_db_tables/1,
+    dump_ets_tables/2
 ]).
 
 -export([
@@ -127,6 +128,9 @@ make_xref(_Node) ->
 
 get_db_tables(Node) ->
     gen_server:call(?MODULE, {get_db_tables, Node}).
+
+dump_ets_tables(Node, Tables) ->
+    gen_server:call(?MODULE, {dump_ets_tables, Node, Tables}).
 
 is_tracing() ->
     gen_server:call(?MODULE, is_tracing).
@@ -274,7 +278,14 @@ handle_call(cluster_application_consistency, _From, State) ->
     {reply, ok, NewState};
 handle_call({get_db_tables, Node}, _From, State) ->
     Res = rpc:call(Node, crell_remote, get_db_tables, []),
-    {reply, Res, State}.
+    {reply, Res, State};
+handle_call({dump_ets_tables, Node, Tables}, _From, State) ->
+    %% MKDIR!!!
+    Filename = "/tmp/crell_dl/bla",
+    EtsData = [ {T, rpc:call(Node, ets, tab2list, [T])} || T <- Tables ],
+    EtsDataBin = list_to_binary(io_lib:format("~p", [EtsData])),
+    ok = file:write_file(Filename, EtsDataBin),
+    {reply, {ok, Filename}, State}.
 
 %% --------------------------------------------------------------------------
 % handle_cast({node_connected, Node, Cookie}, State) ->

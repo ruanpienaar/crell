@@ -1,8 +1,6 @@
 -module(crell_ws_api).
 
--export([init/2]).
--export([websocket_handle/2]).
--export([websocket_info/2]).
+-compile(export_all).
 
 -define(STATE, crell_ws_api).
 -record(?STATE, {}).
@@ -12,18 +10,18 @@ init(Req, _Opts) ->
     process_flag(trap_exit, true),
     {cowboy_websocket, Req, #?STATE{}}.
 
-websocket_handle({text, ReqJson}, State) ->
+websocket_handle({text, ReqJson}, Req, State) ->
     case jsx:decode(ReqJson) of
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"nodes">>},
          {<<"args">>,[]}] ->
             NodesJson = nodes_json(),
-            {reply, {text, NodesJson}, State};
+            {reply, {text, NodesJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"remote_which_applications">>},
          {<<"args">>,[Node]}] ->
             NodeAppsJson = get_node_apps_json(Node),
-            {reply, {text, NodeAppsJson}, State};
+            {reply, {text, NodeAppsJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"add_node">>},
          {<<"args">>,[Node, Cookie]}] ->
@@ -32,21 +30,21 @@ websocket_handle({text, ReqJson}, State) ->
             %% TODO: improve this sleep nonsense...
             %% Hawk is currently configured to wait 1000ms ( 500ms sleep, 10 attempts )
             erlang:start_timer(1050, self(), <<"nodes">>),
-            {reply, reply_ok(), State};
+            {reply, reply_ok(), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"del_node">>},
          {<<"args">>,[Node]}] ->
             ok = crell_server:remove_node(
                 crell_web_utils:ens_atom(Node)
             ),
-            {reply, reply_ok(), State};
+            {reply, reply_ok(), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"non_sys_processes">>},
          {<<"args">>,[Node]}] ->
             PidsJson = pids_json(crell_server:non_sys_processes(
                 crell_web_utils:ens_atom(Node))
             ),
-            {reply, {text, PidsJson}, State};
+            {reply, {text, PidsJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"runtime_modules">>},
          {<<"args">>,[Node]}] ->
@@ -54,22 +52,22 @@ websocket_handle({text, ReqJson}, State) ->
                 crell_web_utils:ens_atom(Node)
             ),
             ModsJson = mods_json(Mods, []),
-            {reply, {text, ModsJson}, State};
+            {reply, {text, ModsJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"is_tracing">>},
          {<<"args">>,[]}] ->
-            {reply, reply("is_tracing", crell_server:is_tracing()), State};
+            {reply, reply("is_tracing", crell_server:is_tracing()), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"toggle_tracing">>},
          {<<"args">>,[]}] ->
-            {reply, reply("is_tracing", crell_server:toggle_tracing()), State};
+            {reply, reply("is_tracing", crell_server:toggle_tracing()), Req, State};
 
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_modules">>},
          {<<"args">>,[]}] ->
             Mods = crell_server:cluster_modules(),
             ModsJson = mods_json(Mods, []),
-            {reply, {text, ModsJson}, State};
+            {reply, {text, ModsJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_module_functions">>},
          {<<"args">>,[Mod]}] ->
@@ -77,7 +75,7 @@ websocket_handle({text, ReqJson}, State) ->
                 crell_web_utils:ens_atom(Mod)
             ),
             ModsFuncJson = mod_funcs_json(ModsFuncs, []),
-            {reply, {text, ModsFuncJson}, State};
+            {reply, {text, ModsFuncJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"calc_app_env">>},
          {<<"args">>,[Node, AppName]}] ->
@@ -88,7 +86,7 @@ websocket_handle({text, ReqJson}, State) ->
                     crell_web_utils:ens_atom(AppName)
                 )
             ),
-            {reply, {text, AppEnvJson}, State};
+            {reply, {text, AppEnvJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"get_db_tables">>},
          {<<"args">>,[Node]}] ->
@@ -96,17 +94,33 @@ websocket_handle({text, ReqJson}, State) ->
                 crell_server:get_db_tables(
                     crell_web_utils:ens_atom(Node)
                 ),
-            {reply, {text, db_info_json(DbTypeTables)}, State};
+            {reply, {text, db_info_json(DbTypeTables)}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"dump_ets_tables">>},
+         {<<"args">>,[Node, Tbls]}] -> %% [<<"workstore">>,<<"shell_records">>]
+            io:format("Tbls : ~p~n", [Tbls]),
+            %% Make a download link to the file...
+            AtomTbls = [ list_to_atom(binary_to_list(T)) || T <- Tbls ],
+            {ok, DLFilename} =
+                crell_server:dump_ets_tables(
+                    crell_web_utils:ens_atom(Node),
+                    AtomTbls
+                ),
+            DownloadJson = jsx:encode([{
+                <<"ets_dl_url">>,
+                crell_web_utils:ens_atom(DLFilename)
+            }]),
+            {reply, {text, DownloadJson}, Req, State};
     	[{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_application_consistency">>},
          {<<"args">>,[]}] ->
             _ConsistencyResponse = crell_server:cluster_application_consistency(),
             _ConsistencyResponseJson  = undefined,
-            {reply, {text, <<"{}">>}, State};
+            {reply, {text, <<"{}">>}, Req, State};
         UnknownJson ->
             io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
-            {reply, {text, Json}, State}
+            {reply, {text, Json}, Req, State}
     end.
 
 reply(Reply, Val) ->
@@ -119,26 +133,26 @@ reply_ok() ->
 % websocket_info(nodes, Req, State) ->
 %     io:format("Websocket info nodes\n"),
 %     NodesJson = nodes_json(),
-%     {reply, {text, NodesJson}, State};
+%     {reply, {text, NodesJson}, Req, State};
 websocket_info({crell_notify,
                 {node_events},
-                {node_connecting,Node}}, State) ->
+                {node_connecting,Node}}, Req, State) ->
     {reply, {text, jsx:encode([{<<"node_connecting">>,
-                                crell_web_utils:ens_bin(Node)}])}, State};
+                                crell_web_utils:ens_bin(Node)}])}, Req, State};
 websocket_info({crell_notify,
                 {node_events},
                 {Event,Node,_Cookie}
-               }, State) when Event == node_connected;
+               }, Req, State) when Event == node_connected;
                                    Event == node_disconnected ->
     {reply, {text, jsx:encode([{crell_web_utils:ens_bin(Event),
-                                crell_web_utils:ens_bin(Node)}])}, State};
-websocket_info({timeout, _Ref, <<"nodes">>}, State) ->
+                                crell_web_utils:ens_bin(Node)}])}, Req, State};
+websocket_info({timeout, _Ref, <<"nodes">>}, Req, State) ->
     NodesJson = nodes_json(),
-    {reply, {text, NodesJson}, State};
-websocket_info(Info, State) ->
+    {reply, {text, NodesJson}, Req, State};
+websocket_info(Info, Req, State) ->
     io:format("Info : ~p\n", [Info]),
     Json = <<"reply">>,
-    {reply, {text, Json}, State}.
+    {reply, {text, Json}, Req, State}.
 
 nodes_json() ->
     jsx:encode([{<<"nodes">>,

@@ -49,7 +49,9 @@
             var db_tables = json_data.db_tables;
             for(var e in db_tables.ets_tables){
                 etbl = db_tables.ets_tables[e];
-                $('#ets_db_tables').append('<tr><td>'+etbl+'</td></tr>');
+                $('#ets_db_tables').append(
+                    '<tr><td>'+ets_exp_chk(etbl)+'</td>'+
+                    '<td>'+etbl+'</td></tr>');
             }
 
             // handle mnesia, if mnesia is started.
@@ -59,13 +61,40 @@
                 var db_tables = json_data.db_tables;
                 for(var m in db_tables.mnesia_tables){
                     mtbl = db_tables.mnesia_tables[m];
-                    $('#mnesia_db_tables').append('<tr><td>'+mtbl+'</td></tr>');
+                    $('#mnesia_db_tables').append(
+                        '<tr><td>'+mnesia_exp_chk(mtbl)+'</td>'+
+                        '<td>'+mtbl+'</td></tr>');
                 }
             } else {
-                $('#mnesia_db_tables').append('<tr><td>N/A</td></tr>');
+                $('#mnesia_db_tables').append(
+                    '<tr><td>N/A</td></tr>');
             }
+        // {"ets_dl_url":"/tmp/bla"}
+        } else if(json_data.hasOwnProperty('ets_dl_url')){
+            var dl = json_data.ets_dl_url;
+            alert(dl);
+
         }
     }
+
+    function ets_exp_chk(ets_tbl_name){
+        return '<input class="ets-form-check-input form-check-input"'+
+        ' type="checkbox" name="ets_table" '+
+        'value="'+ets_tbl_name+'" />';
+    }
+
+    function mnesia_exp_chk(mnesia_tbl_name){
+        return '<input class="mnesia-form-check-input form-check-input"'+
+        ' type="checkbox" name="mnesia_table" '+
+        'value="'+mnesia_tbl_name+'" />';
+    }
+
+    // function export_ets_table_html_td(ets_tbl_name){
+    //     var html = '<td><button onclick='+
+    //     '"export_db_table(\''+ets_tbl_name+'\')">'+
+    //     '"Export</button></td>';
+    //     return html;
+    // }
 
     function get_db_tables(node){
         ws.send(JSON.stringify({'module':'crell_server',
@@ -80,5 +109,23 @@
         get_db_tables($('#nodes').val());
     });
 
+    $scope.angjs_export_sel = function angjs_export_sel(){
+        var ets_tbl_names=[];
+        $('.ets-form-check-input:checkbox:checked').each(function(){
+            ets_tbl_names.push($(this).val());
+        });
+        if(ets_tbl_names.length>0){
+            ws.send(JSON.stringify({
+                'module':'crell_server',
+                'function':'dump_ets_tables',
+                'args':[$('#nodes').val(), ets_tbl_names]
+            }));
+        }
+    }
+
   });
 })();
+
+function export_sel(){
+    angular.element(document.getElementsByTagName('body')).scope().angjs_export_sel();
+}
