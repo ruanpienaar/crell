@@ -1,6 +1,10 @@
 -module(crell_ws_api).
 
--compile(export_all).
+
+-export([init/2]).
+-export([websocket_handle/3]).
+-export([websocket_info/3]).
+
 
 -define(STATE, crell_ws_api).
 -record(?STATE, {}).
@@ -61,7 +65,6 @@ websocket_handle({text, ReqJson}, Req, State) ->
          {<<"function">>,<<"toggle_tracing">>},
          {<<"args">>,[]}] ->
             {reply, reply("is_tracing", crell_server:toggle_tracing()), Req, State};
-
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_modules">>},
          {<<"args">>,[]}] ->
