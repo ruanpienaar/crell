@@ -30,7 +30,8 @@
     remote_which_applications/1,
     make_xref/1,
     get_db_tables/1,
-    dump_ets_tables/2
+    dump_ets_tables/2,
+    dump_mnesia_tables/2
 ]).
 
 -export([
@@ -132,6 +133,9 @@ get_db_tables(Node) ->
 dump_ets_tables(Node, Tables) ->
     gen_server:call(?MODULE, {dump_ets_tables, Node, Tables}).
 
+dump_mnesia_tables(Node, Tables) ->
+    gen_server:call(?MODULE, {dump_mnesia_tables, Node, Tables}).
+
 is_tracing() ->
     gen_server:call(?MODULE, is_tracing).
 
@@ -144,6 +148,7 @@ cluster_application_consistency() ->
 %% ---------------------------------------
 
 init({}) ->
+    %% TODO: maybe check with Hawk, who's already connected...
     process_flag(trap_exit, true),
     {ok, #?STATE{}}.
 
@@ -242,15 +247,14 @@ handle_call(E={node_connected, Node, Cookie}, _From, State) ->
     crell_notify:action(E),
     {reply, ok, NewState};
 handle_call(E={node_disconnected, Node, Cookie}, _From, State) ->
-    crell_notify:action(E),
-    {reply, ok, remove_node(Node, Cookie, State)};
-
+    NewState = do_remove_node(E, Node, Cookie, State),
+    {reply, ok, NewState};
 handle_call(is_tracing, _From, State) ->
     {reply, State#?STATE.tracing, State};
 %% TODO: maybe add some more conditions,
 handle_call(toggle_tracing, _From, #?STATE{tracing=true} = State) ->
     ok = orddict:fold(fun(Node,NodeDict,ok) ->
-        io:format("Disable tracing on : ~p~n", [Node]),
+        % io:format("Disable tracing on : ~p~n", [Node]),
         ok = goanna_api:stop_trace(),
         true = goanna_api:remove_goanna_callbacks(Node),
         ok = goanna_api:remove_goanna_node(Node)
@@ -260,7 +264,7 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
     ok = orddict:fold(fun(Node,NodeDict,ok) ->
         % io:format("Node:~p~n", [Node])
         Cookie = dict:fetch(cookie, NodeDict),
-        io:format("Enable tracing on : ~p~n", [Node]),
+        % io:format("Enable tracing on : ~p~n", [Node]),
         % {error,{already_started,P}} = goanna_api:add_node(Node,Cookie,tcpip_port),
         {ok,updated} = goanna_api:add_node_callbacks(Node, Cookie),
         ok
@@ -269,9 +273,9 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
 
 handle_call(cluster_application_consistency, _From, State) ->
     {NodeReplies, NewState} =
-        orddict:fold(fun(Node, _Value, {Replies, State}) ->
-
-            {ok, Reply, UpdatedState} = update_state(Node, State, remote_which_applications),
+        orddict:fold(fun(Node, _Value, {Replies, S}) ->
+            {ok, Reply, UpdatedState} = 
+                update_state(Node, S, remote_which_applications),
             {[Reply|Replies], UpdatedState}
         end, {[], State}, State#?STATE.nodes),
     % io:format("~p~n", [NodeReplies]),
@@ -280,12 +284,17 @@ handle_call({get_db_tables, Node}, _From, State) ->
     Res = rpc:call(Node, crell_remote, get_db_tables, []),
     {reply, Res, State};
 handle_call({dump_ets_tables, Node, Tables}, _From, State) ->
-    %% MKDIR!!!
-    Filename = "/tmp/crell_dl/bla",
-    EtsData = [ {T, rpc:call(Node, ets, tab2list, [T])} || T <- Tables ],
-    EtsDataBin = list_to_binary(io_lib:format("~p", [EtsData])),
-    ok = file:write_file(Filename, EtsDataBin),
-    {reply, {ok, Filename}, State}.
+    F = fun() ->
+        rpc:call(Node, crell_remote, dump_ets_tables, [Tables])
+    end,
+    {ok, Filename} = dump_tables_to_random_file(Node, Tables, F),
+    {reply, Filename, State};
+handle_call({dump_mnesia_tables, Node, Tables}, _From, State) ->
+    F = fun() ->
+        rpc:call(Node, crell_remote, dump_mnesia_tables, [Tables])
+    end,
+    {ok, Filename} = dump_tables_to_random_file(Node, Tables, F),
+    {reply, Filename, State}.
 
 %% --------------------------------------------------------------------------
 % handle_cast({node_connected, Node, Cookie}, State) ->
@@ -303,7 +312,14 @@ handle_info(Info, State) ->
     {noreply, State}.
 %% --------------------------------------------------------------------------
 
-terminate(_Reason, _State) ->
+terminate(_Reason, #?STATE{ nodes = Nodes } = State) ->
+    orddict:fold(fun(Node=Key, RemoteStateDict, _) ->
+        io:format("!!!!!!!!!!!!!!!!!! ~n~n~n terminate ~p ~n~n~n", [Node]),
+        Cookie = dict:fetch(cookie, RemoteStateDict),
+        E={node_disconnected, Node, Cookie},
+        crell_notify:action(E),
+        remove_node(Node)
+    end, 0, Nodes),
     ok.
 %% --------------------------------------------------------------------------
 
@@ -433,3 +449,33 @@ fun_src(Mod, Fun, Arity) ->
 
 state_nodes(State) ->
     orddict:fetch_keys(State#?STATE.nodes).
+
+-spec mktemp(Prefix) -> Result
+   when Prefix   :: string(),
+        Result   :: {ok, TempFile  :: file:filename()}
+                  | {error, Reason :: file:posix()}.
+
+dump_tables_to_random_file(Node, Tables, DataFun) ->
+    {ok, RelDir} = file:get_cwd(),
+    {ok, Filename} = mktemp(RelDir),
+    DataBin = DataFun(),
+    ok = file:write_file(Filename, DataBin),
+    {ok, Filename}.
+
+
+%% https://stackoverflow.com/questions/1222084/how-do-i-create-a-temp-filename-in-erlang
+mktemp(Prefix) ->
+    Rand = integer_to_list(binary:decode_unsigned(crypto:strong_rand_bytes(8)), 36),
+    TempPath = filename:basedir(user_cache, Prefix),
+    TempFile = filename:join(TempPath, Rand),
+    Result1 = filelib:ensure_dir(TempFile),
+    Result2 = file:write_file(TempFile, <<>>),
+    case {Result1, Result2} of
+         {ok, ok}    -> {ok, TempFile};
+         {ok, Error} -> Error;
+         {Error, _}  -> Error
+    end.
+
+do_remove_node(E, Node, Cookie, State) ->
+    crell_notify:action(E),
+    _NewState = remove_node(Node, Cookie, State).

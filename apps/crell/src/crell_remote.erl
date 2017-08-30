@@ -10,7 +10,9 @@
     calc_proc_tree/2,
     non_sys_processes/0,
     get_app_env/0,
-    get_db_tables/0
+    get_db_tables/0,
+    dump_ets_tables/1,
+    dump_mnesia_tables/1
 ]).
 %%----------------------------------------------------------------------
 
@@ -465,8 +467,8 @@ get_db_tables() ->
 
 %% COPIED FROM observer_backend.erl ( from runtime_tools )
 tables(ets) ->
-    Opts = [{unread_hidden, false},
-            {sys_hidden, false}
+    Opts = [{unread_hidden, true},
+            {sys_hidden, true}
     ],
     HideUnread = proplists:get_value(unread_hidden, Opts, true),
     HideSys = proplists:get_value(sys_hidden, Opts, true),
@@ -512,7 +514,7 @@ tables(ets) ->
     end,
     lists:foldl(Fun, [], ets:all());
 tables(mnesia) ->
-    Opts = [{sys_hidden, false}
+    Opts = [{sys_hidden, true}
     ],
     HideSys = proplists:get_value(sys_hidden, Opts, true),
     Owner = ets:info(schema, owner),
@@ -602,3 +604,31 @@ mnesia_tables() ->
      mesh_type, mnesia_clist, orber_CosNaming,
      orber_objkeys, user
     ].
+
+dump_ets_tables(Tables) ->
+    EtsData = [ {T, ets:tab2list(T)} || T <- Tables ],
+    EtsDataBin = list_to_binary(io_lib:format("~p", [EtsData])).
+
+dump_mnesia_tables(Tables) ->
+    L = lists:map(fun(Table) ->
+        mnesia:transaction(reading_mnesia_entries(Table))
+    end),
+    list_to_binary(io_lib:format("~p", [L])).
+
+reading_mnesia_entries(Table) ->
+    reading_mnesia_entries(Table, started, []).
+
+reading_mnesia_entries(Table, '$end_of_table', R) ->
+    lists:reverse(R);
+reading_mnesia_entries(Table, started, []) ->
+    reading_mnesia_entries(Table, mnesia:first(Table), []);
+reading_mnesia_entries(Table, Key, R) ->
+    reading_mnesia_entries(
+        Table,
+        mnesia:next(Key),
+        [mread(Table, Key)|R]
+    ).
+
+mread(T, K) ->
+    [V] = mnesia:read(T, K),
+    V.
