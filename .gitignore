@@ -18,3 +18,4 @@ rel/crell
 _build/
 rebar3.crashdump
 rebar.lock
+apps/crell_web/priv/www/dl/*.txt

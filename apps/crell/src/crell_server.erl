@@ -461,30 +461,35 @@ fun_src(Mod, Fun, Arity) ->
 state_nodes(State) ->
     orddict:fetch_keys(State#?STATE.nodes).
 
--spec mktemp(Prefix) -> Result
-   when Prefix   :: string(),
-        Result   :: {ok, TempFile  :: file:filename()}
-                  | {error, Reason :: file:posix()}.
+% -spec mktemp(Prefix) -> Result
+%    when Prefix   :: string(),
+%         Result   :: {ok, TempFile  :: file:filename()}
+%                   | {error, Reason :: file:posix()}.
 
 dump_tables_to_random_file(Node, Tables, DataFun) ->
     % {ok, RelDir} = file:get_cwd(),
     DownloadDir = code:priv_dir(crell_web)++"/www/dl",
-    {ok, Filename} = mktemp(DownloadDir),
+    {ok, Filename} = rand_file(DownloadDir),
     DataBin = DataFun(),
     % io:format("~p~n", [DataBin]),
     ok = file:write_file(Filename, DataBin),
     {ok, "dl/"++filename:basename(Filename)}.
 
+rand_file(Prefix) ->
+    Rand = integer_to_list(binary:decode_unsigned(crypto:strong_rand_bytes(8)), 36)++".txt",
+    TempFile = filename:join(Prefix, Rand),
+    ok = file:write_file(TempFile, <<>>),
+    {ok, TempFile}.
 
 %% https://stackoverflow.com/questions/1222084/how-do-i-create-a-temp-filename-in-erlang
-mktemp(Prefix) ->
-    Rand = integer_to_list(binary:decode_unsigned(crypto:strong_rand_bytes(8)), 36)++".txt",
-    TempPath = filename:basedir(user_cache, Prefix),
-    TempFile = filename:join(TempPath, Rand),
-    Result1 = filelib:ensure_dir(TempFile),
-    Result2 = file:write_file(TempFile, <<>>),
-    case {Result1, Result2} of
-         {ok, ok}    -> {ok, TempFile};
-         {ok, Error} -> Error;
-         {Error, _}  -> Error
-    end.
+%mktemp(Prefix) ->
+%    Rand = integer_to_list(binary:decode_unsigned(crypto:strong_rand_bytes(8)), 36)++".txt",
+%    TempPath = filename:basedir(user_cache, Prefix),
+%    TempFile = filename:join(TempPath, Rand),
+%    Result1 = filelib:ensure_dir(TempFile),
+%    Result2 = file:write_file(TempFile, <<>>),
+%    case {Result1, Result2} of
+%         {ok, ok}    -> {ok, TempFile};
+%         {ok, Error} -> Error;
+%         {Error, _}  -> Error
+%    end.
