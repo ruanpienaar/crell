@@ -20,7 +20,7 @@
         handle_message(message);
     };
     ws.onclose = function(){
-        alert('closed');
+        console.log('Websocket closed !');
     };
 
     function handle_message(msg) {

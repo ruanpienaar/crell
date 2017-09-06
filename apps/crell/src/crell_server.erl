@@ -16,6 +16,7 @@
     add_node/2,
     remove_node/1,
     nodes/0,
+    connecting_nodes/0,
     runtime_modules/1,
     cluster_modules/0,
     cluster_module_functions/1,
@@ -56,6 +57,7 @@ start_link() ->
 
 %% TODO: extremely slow adding nodes, block other nodes from being added...FIXME
 add_node(Node, Cookie) ->
+    {atomic, ok} = crell_nodes:create(crell_nodes:new(Node, Cookie)),
     ConnectedCallBack = [{crell_connect, fun() ->
         ok=gen_server:call(?MODULE, {node_connected, Node, Cookie}, infinity) end}],
     DisconnCallBack = [{crell_disconnect, fun() ->
@@ -75,15 +77,24 @@ add_node(Node, Cookie) ->
             end;
         false ->
             {ok,_} = hawk:add_node(Node, Cookie, ConnectedCallBack, DisconnCallBack),
+            ok;
+        {error,connecting} ->
             ok
     end.
 
 remove_node(Node) ->
+    {atomic, ok} = crell_nodes:delete(Node),
     ok = purge_module(Node, crell_remote),
-    ok = hawk:remove_node(Node).
+    ok = hawk:remove_node(Node),
+    crell_notify:action({node_deleted, Node}),
+    ok.
 
 nodes() ->
     gen_server:call(?MODULE, nodes, infinity).
+
+%% TODO: could've also casted, and then sent the response with grpoc as a event.
+connecting_nodes() ->
+    gen_server:call(?MODULE, connecting_nodes).
 
 %% Maybe we should bundle modules per application ?
 
@@ -131,10 +142,10 @@ get_db_tables(Node) ->
     gen_server:call(?MODULE, {get_db_tables, Node}).
 
 dump_ets_tables(Node, Tables) ->
-    gen_server:call(?MODULE, {dump_ets_tables, Node, Tables}).
+    gen_server:call(?MODULE, {dump_ets_tables, Node, Tables}, infinity).
 
 dump_mnesia_tables(Node, Tables) ->
-    gen_server:call(?MODULE, {dump_mnesia_tables, Node, Tables}).
+    gen_server:call(?MODULE, {dump_mnesia_tables, Node, Tables}, infinity).
 
 is_tracing() ->
     gen_server:call(?MODULE, is_tracing).
@@ -150,6 +161,15 @@ cluster_application_consistency() ->
 init({}) ->
     %% TODO: maybe check with Hawk, who's already connected...
     process_flag(trap_exit, true),
+
+    %% add the old nodes:
+    lists:foreach(fun(NodeRec) ->
+        NP = crell_nodes:obj_to_proplist(NodeRec),
+        {node, Node} = lists:keyfind(node, 1, NP),
+        {cookie, Cookie} = lists:keyfind(cookie, 1, NP),
+        ok = crell_server:add_node(Node, Cookie)
+    end, crell_nodes:all()),
+
     {ok, #?STATE{}}.
 
 update_state(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
@@ -195,6 +215,9 @@ do_get_values(Node, RemoteState, remote_which_applications) ->
 
 handle_call(nodes, _From, State) ->
     {reply, state_nodes(State), State};
+handle_call(connecting_nodes, _From, State) ->
+
+    {reply, hawk:nodes() -- state_nodes(State), State};
 handle_call({runtime_modules, Node}, _From, State) ->
     % Update state here
     {ok, Reply, NewState} = update_state(Node, State, get_remote_modules),
@@ -243,12 +266,16 @@ handle_call({remote_which_applications, Node}, _From, State) ->
     {reply, Reply, State};
 handle_call(E={node_connected, Node, Cookie}, _From, State) ->
     crell_notify:action({node_connecting, Node}),
-    NewState = add_node(Node, Cookie, State),
+    {ok, RemoteState} = start_remote_code(Node, Cookie),
+    RemoteState2 = dict:store(cookie, Cookie, RemoteState),
+    crell_nodes:node_connected(Node),
     crell_notify:action(E),
-    {reply, ok, NewState};
+    {reply, ok, State#?STATE{
+        nodes = orddict:store(Node, RemoteState2, State#?STATE.nodes)
+    }};
 handle_call(E={node_disconnected, Node, Cookie}, _From, State) ->
-    NewState = do_remove_node(E, Node, Cookie, State),
-    {reply, ok, NewState};
+    crell_notify:action(E),
+    {reply, ok, State#?STATE{ nodes = orddict:erase(Node, State#?STATE.nodes) }};
 handle_call(is_tracing, _From, State) ->
     {reply, State#?STATE.tracing, State};
 %% TODO: maybe add some more conditions,
@@ -274,7 +301,7 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
 handle_call(cluster_application_consistency, _From, State) ->
     {NodeReplies, NewState} =
         orddict:fold(fun(Node, _Value, {Replies, S}) ->
-            {ok, Reply, UpdatedState} = 
+            {ok, Reply, UpdatedState} =
                 update_state(Node, S, remote_which_applications),
             {[Reply|Replies], UpdatedState}
         end, {[], State}, State#?STATE.nodes),
@@ -297,12 +324,6 @@ handle_call({dump_mnesia_tables, Node, Tables}, _From, State) ->
     {reply, Filename, State}.
 
 %% --------------------------------------------------------------------------
-% handle_cast({node_connected, Node, Cookie}, State) ->
-%     {noreply, add_node(Node, Cookie, State)};
-% handle_cast({node_disconnected, Node, Cookie}, State) ->
-%     {noreply, remove_node(Node, Cookie, State)};
-% handle_cast({node_removed, Node, Cookie}, State) ->
-%     {noreply, remove_node(Node, Cookie, State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 %% --------------------------------------------------------------------------
@@ -314,11 +335,11 @@ handle_info(Info, State) ->
 
 terminate(_Reason, #?STATE{ nodes = Nodes } = State) ->
     orddict:fold(fun(Node=Key, RemoteStateDict, _) ->
-        io:format("!!!!!!!!!!!!!!!!!! ~n~n~n terminate ~p ~n~n~n", [Node]),
+        %%io:format("!!!!!!!!!!!!!!!!!! ~n~n~n terminate ~p ~n~n~n", [Node]),
         Cookie = dict:fetch(cookie, RemoteStateDict),
-        E={node_disconnected, Node, Cookie},
-        crell_notify:action(E),
-        remove_node(Node)
+        E={node_disconnected, Node, Cookie}
+        %% crell_notify:action(E),
+        %% remove_node(Node)
     end, 0, Nodes),
     ok.
 %% --------------------------------------------------------------------------
@@ -326,16 +347,6 @@ terminate(_Reason, #?STATE{ nodes = Nodes } = State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 %% --------------------------------------------------------------------------
-
-add_node(Node, Cookie, #?STATE{ nodes = N } = State) ->
-    {ok, RemoteState} = start_remote_code(Node, Cookie),
-    RemoteState2 = dict:store(cookie, Cookie, RemoteState),
-    State#?STATE{
-        nodes = orddict:store(Node, RemoteState2, N)
-    }.
-
-remove_node(Node, _Cookie, #?STATE{ nodes = N } = State) ->
-    State#?STATE{ nodes = orddict:erase(Node, N) }.
 
 start_remote_code(Node,_Cookie) ->
     case application:get_env(crell, remote_action) of
@@ -456,16 +467,18 @@ state_nodes(State) ->
                   | {error, Reason :: file:posix()}.
 
 dump_tables_to_random_file(Node, Tables, DataFun) ->
-    {ok, RelDir} = file:get_cwd(),
-    {ok, Filename} = mktemp(RelDir),
+    % {ok, RelDir} = file:get_cwd(),
+    DownloadDir = code:priv_dir(crell_web)++"/www/dl",
+    {ok, Filename} = mktemp(DownloadDir),
     DataBin = DataFun(),
+    % io:format("~p~n", [DataBin]),
     ok = file:write_file(Filename, DataBin),
-    {ok, Filename}.
+    {ok, "dl/"++filename:basename(Filename)}.
 
 
 %% https://stackoverflow.com/questions/1222084/how-do-i-create-a-temp-filename-in-erlang
 mktemp(Prefix) ->
-    Rand = integer_to_list(binary:decode_unsigned(crypto:strong_rand_bytes(8)), 36),
+    Rand = integer_to_list(binary:decode_unsigned(crypto:strong_rand_bytes(8)), 36)++".txt",
     TempPath = filename:basedir(user_cache, Prefix),
     TempFile = filename:join(TempPath, Rand),
     Result1 = filelib:ensure_dir(TempFile),
@@ -475,7 +488,3 @@ mktemp(Prefix) ->
          {ok, Error} -> Error;
          {Error, _}  -> Error
     end.
-
-do_remove_node(E, Node, Cookie, State) ->
-    crell_notify:action(E),
-    _NewState = remove_node(Node, Cookie, State).

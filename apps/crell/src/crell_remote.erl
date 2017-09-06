@@ -36,7 +36,8 @@ remote_modules(Dict) ->
     dict:store(remote_modules, get_remote_modules(), Dict).
 
 get_remote_modules() ->
-    [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
+    % [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
+    [{Mod, []} || {Mod, _FPath} <- code:all_loaded()].
 
 remote_applications(Dict) ->
     dict:store(remote_running_applications, running_apps(), Dict).
@@ -468,7 +469,7 @@ get_db_tables() ->
 %% COPIED FROM observer_backend.erl ( from runtime_tools )
 tables(ets) ->
     Opts = [{unread_hidden, true},
-            {sys_hidden, true}
+            {sys_hidden, false}
     ],
     HideUnread = proplists:get_value(unread_hidden, Opts, true),
     HideSys = proplists:get_value(sys_hidden, Opts, true),
@@ -514,7 +515,7 @@ tables(ets) ->
     end,
     lists:foldl(Fun, [], ets:all());
 tables(mnesia) ->
-    Opts = [{sys_hidden, true}
+    Opts = [{sys_hidden, false}
     ],
     HideSys = proplists:get_value(sys_hidden, Opts, true),
     Owner = ets:info(schema, owner),
@@ -605,14 +606,31 @@ mnesia_tables() ->
      orber_objkeys, user
     ].
 
-dump_ets_tables(Tables) ->
-    EtsData = [ {T, ets:tab2list(T)} || T <- Tables ],
-    EtsDataBin = list_to_binary(io_lib:format("~p", [EtsData])).
+dump_ets_tables(Tables) when is_list(Tables) ->
+    dump_ets_tables(Tables, []).
+
+dump_ets_tables([], R) ->
+    lists:reverse(R);
+dump_ets_tables([H|T], R) ->
+    dump_ets_tables(T, [try_dump_ets(H)|R]).
+
+try_dump_ets(Table) ->
+    try
+        list_to_binary(io_lib:format("~p~n", [{Table, ets:tab2list(Table)}]))
+    catch
+        C:E ->
+            R={Table, {C, E, erlang:get_stacktrace()}},
+            list_to_binary( io_lib:format("~p~n", [R]) )
+    end.
 
 dump_mnesia_tables(Tables) ->
+    mnesia:info(),
     L = lists:map(fun(Table) ->
-        mnesia:transaction(reading_mnesia_entries(Table))
-    end),
+        {atomic, Res} = mnesia:transaction(fun() ->
+            reading_mnesia_entries(Table)
+        end),
+        {Table, Res}
+    end, Tables),
     list_to_binary(io_lib:format("~p", [L])).
 
 reading_mnesia_entries(Table) ->
@@ -625,7 +643,7 @@ reading_mnesia_entries(Table, started, []) ->
 reading_mnesia_entries(Table, Key, R) ->
     reading_mnesia_entries(
         Table,
-        mnesia:next(Key),
+        mnesia:next(Table, Key),
         [mread(Table, Key)|R]
     ).
 

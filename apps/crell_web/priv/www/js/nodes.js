@@ -15,12 +15,18 @@
                                     []
                                })
         );
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'connecting_nodes',
+                                'args':
+                                    []
+                               })
+        );
     };
     ws.onmessage = function(message) {
         handle_message(message);
     };
     ws.onclose = function(){
-        alert('closed');
+        console.log('Websocket closed !');
     };
 
     function handle_message(msg) {
@@ -34,18 +40,40 @@
             if(json_data.nodes.length==0){
                 $('#nodes_info_label').html('No nodes added. Add a node on this page.');
             } else {
-                $('#nodes_info_label').html('');
+                $('#nodes_info_label').html('&nbsp;');
+            }
+        } else if(json_data.hasOwnProperty('connecting_nodes')) {
+            $('#conn_nodes').empty();
+            for(var n in json_data.connecting_nodes){
+                var node = json_data.connecting_nodes[n];
+                $('#conn_nodes').append('<option value='+node+' >'+node+'</option>');
+            }
+            if(json_data.connecting_nodes.length==0){
+                $('#conn_nodes_info_label').html('No nodes Connecting.');
+            } else {
+                $('#conn_nodes_info_label').html('&nbsp;');
             }
         } else if(json_data.hasOwnProperty('node_connecting')) {
-            $('#loaderImg').attr("class", "visible");
+            //$('#loaderImg').attr("class", "visible");
+            var node = json_data.node_connecting;
+            if( $("#conn_nodes option[value='"+node+"']").length == 0 ){
+                $('#conn_nodes').append('<option value='+node+' >'+node+'</option>');
+            }
         } else if(json_data.hasOwnProperty('node_connected')) {
-            $('#loaderImg').attr("class", "invisible");
             var node = json_data.node_connected;
+            $("#conn_nodes option[value='"+node+"']").remove();
             $('#nodes').append('<option value='+node+' >'+node+'</option>');
-            $('#nodes_info_label').html('');
+            $('#nodes_info_label').html('&nbsp;');
         } else if(json_data.hasOwnProperty('node_disconnected')) {
             var node = json_data.node_disconnected;
             $("#nodes option[value='"+node+"']").remove();
+            if( $('#nodes').has('option').length == 0 ) {
+                $('#nodes_info_label').html('No nodes added. Add a node on this page.');
+            }
+            $('#conn_nodes').append('<option value='+node+' >'+node+'</option>');
+        } else if(json_data.hasOwnProperty('node_deleted')) {
+            var node = json_data.node_deleted;
+            $("#conn_nodes option[value='"+node+"']").remove();
             if( $('#nodes').has('option').length == 0 ) {
                 $('#nodes_info_label').html('No nodes added. Add a node on this page.');
             }
@@ -77,13 +105,30 @@
             ws.send(JSON.stringify({'module':'crell_server',
                                     'function':'del_node',
                                     'args':
-                                        [$('#nodes').val()]
+                                        // not a array, since its a multiple select
+                                        $('#nodes').val()
                                    })
             );
         }
     });
 
     $('#edit_node').click(function(){
+        alert('Not implemented yet.');
+    });
+
+    $('#conn_del_node').click(function(){
+        if ( confirm("Remove node "+$('#conn_nodes').val()+" ?") ){
+            ws.send(JSON.stringify({'module':'crell_server',
+                                    'function':'conn_del_node',
+                                    'args':
+                                        // not a array, since its a multiple select
+                                        $('#conn_nodes').val()
+                                   })
+            );
+        }
+    });
+
+    $('#conn_edit_node').click(function(){
         alert('Not implemented yet.');
     });
 

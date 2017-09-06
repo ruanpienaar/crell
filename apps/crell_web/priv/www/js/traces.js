@@ -72,6 +72,7 @@
                                     []
                                })
         );
+        console.log('GWS Websocket closed !');
     }
 
     // crell ws api
@@ -175,7 +176,7 @@
         }
     }
     ws.onclose = function(){
-
+        console.log('Websocket closed !');
     }
 
     $('#pollBtn').click(function(){

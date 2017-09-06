@@ -36,29 +36,32 @@
       </div>
 
     <div class="container-fluid">
-
         <h2>Nodes</h2>
-
         <div class="col-md-6">
-
             <div class="form-inline">
                 <p>Add a node</p>
                 <input class="form-control" type="text" id="node" />
                 <input class="form-control" type="text" id="cookie" />
-
                 <button class="btn btn-primary" id="save_node">Save</button>
             </div>
         </div>
-        <div class="col-md-6">
-
+        <div class="col-md-3">
+            <div class="form-inline">
+                <p>Connecting nodes</p>
+                <div id="conn_nodes_info_label"></div>
+                <select class="form-control" id="conn_nodes" multiple style="width:250px; height:250px"></select>
+                <button class="btn btn-primary" id="conn_edit_node">Edit</button>
+                <button class="btn btn-primary" id="conn_del_node">Delete</button>
+            </div>
+        </div>
+        <div class="col-md-3">
             <div class="form-inline">
                 <p>Existing nodes</p>
                 <div id="nodes_info_label"></div>
-                <select class="form-control" id="nodes"></select>
+                <select class="form-control" id="nodes" multiple style="width:250px; height:250px"></select>
                 <button class="btn btn-primary" id="edit_node">Edit</button>
                 <button class="btn btn-primary" id="del_node">Delete</button>
             </div>
-            <img id="loaderImg" class="invisible" style="width:100px; height:100px;" src="img/loader.gif" />
         </div>
      </div>
 

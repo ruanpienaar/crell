@@ -21,3 +21,5 @@
 -proto_dist hawk_tcp
 
 -hidden
+
+-mnesia dir '"Mnesia"'

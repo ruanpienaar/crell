@@ -16,15 +16,22 @@
 %% ===================================================================
 
 start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    {ok, P} = supervisor:start_link({local, ?MODULE}, ?MODULE, []),
+
+    % % %% add the old nodes:
+    % lists:foreach(fun(NodeRec) ->
+    %     NP = crell_nodes:obj_to_proplist(NodeRec),
+    %     {node, Node} = lists:keyfind(node, 1, NP),
+    %     {cookie, Cookie} = lists:keyfind(cookie, 1, NP),
+    %     ok = crell_server:add_node(Node, Cookie)
+    % end, crell_nodes:all()),
+
+    {ok, P}.
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, [
-        ?CHILD(crell_server, worker)
-        % ?CHILD(crell_nodes, worker)
-    ]} }.
+    {ok, { {one_for_one, 5, 10}, [?CHILD(crell_server, worker)]} }.
 

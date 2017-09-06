@@ -56,7 +56,7 @@ routes() ->
             {"/crell/ws", crell_ws_api, []},
 
             %% Download files from tmp
-            {"/dl/[...]", cowboy_static, {dir, "/tmp/crell_dl"}},
+            {"/dl/[...]", cowboy_static, {priv_dir, crell_web, "/www/dl"}},
             {"/[...]", cowboy_static, {priv_dir, crell_web, "/www"}}
         ]
      }

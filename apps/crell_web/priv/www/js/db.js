@@ -22,7 +22,7 @@
     }
 
     ws.onclose = function(){
-        alert('closed');
+        console.log('Websocket closed !');
     }
 
     function handle_message(msg){
@@ -70,10 +70,12 @@
                     '<tr><td>N/A</td></tr>');
             }
         // {"ets_dl_url":"/tmp/bla"}
-        } else if(json_data.hasOwnProperty('ets_dl_url')){
+        } else if(json_data.hasOwnProperty('ets_dl_url')) {
             var dl = json_data.ets_dl_url;
-            alert(dl);
-
+            window.location = dl;
+        } else if(json_data.hasOwnProperty('mnesia_dl_url')) {
+            var dl = json_data.mnesia_dl_url;
+            window.location = dl;
         }
     }
 
@@ -109,7 +111,7 @@
         get_db_tables($('#nodes').val());
     });
 
-    $scope.angjs_export_sel = function angjs_export_sel(){
+    $scope.angjs_ets_export_sel = function angjs_ets_export_sel(){
         var ets_tbl_names=[];
         $('.ets-form-check-input:checkbox:checked').each(function(){
             ets_tbl_names.push($(this).val());
@@ -123,9 +125,51 @@
         }
     }
 
+    $scope.angjs_mnesia_export_sel = function angjs_mnesia_export_sel(){
+        var mnesia_tbl_names=[];
+        $('.mnesia-form-check-input:checkbox:checked').each(function(){
+            mnesia_tbl_names.push($(this).val());
+        });
+        if(mnesia_tbl_names.length>0){
+            ws.send(JSON.stringify({
+                'module':'crell_server',
+                'function':'dump_mnesia_tables',
+                'args':[$('#nodes').val(), mnesia_tbl_names]
+            }));
+        }
+    }
+
   });
 })();
 
-function export_sel(){
-    angular.element(document.getElementsByTagName('body')).scope().angjs_export_sel();
+function ets_export_sel(){
+    angular.element(document.getElementsByTagName('body')).scope().angjs_ets_export_sel();
 }
+
+function mnesia_export_sel(){
+    angular.element(document.getElementsByTagName('body')).scope().angjs_mnesia_export_sel();
+}
+
+function ets_select_all(){
+    $('.ets-form-check-input:checkbox').each(function(){
+        $(this).attr('checked', true);
+    });
+}
+
+// function ets_select_none(){
+//     $('.ets-form-check-input:checkbox').each(function(){
+//         $(this).attr('checked', false);
+//     });
+// }
+
+function mnesia_select_all(){
+    $('.mnesia-form-check-input:checkbox').each(function(){
+        $(this).attr('checked', true);
+    });
+}
+
+// function mnesia_select_none(){
+//     $('.mnesia-form-check-input:checkbox').each(function(){
+//         $(this).attr('checked', false);
+//     });
+// }

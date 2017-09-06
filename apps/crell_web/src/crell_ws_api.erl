@@ -22,6 +22,11 @@ websocket_handle({text, ReqJson}, Req, State) ->
             NodesJson = nodes_json(),
             {reply, {text, NodesJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"connecting_nodes">>},
+         {<<"args">>,[]}] ->
+            ConnectingNodesJson = connecting_nodes_json(),
+            {reply, {text, ConnectingNodesJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"remote_which_applications">>},
          {<<"args">>,[Node]}] ->
             NodeAppsJson = get_node_apps_json(Node),
@@ -31,16 +36,17 @@ websocket_handle({text, ReqJson}, Req, State) ->
          {<<"args">>,[Node, Cookie]}] ->
             ok = crell_server:add_node(crell_web_utils:ens_atom(Node),
                                        crell_web_utils:ens_atom(Cookie)),
-            %% TODO: improve this sleep nonsense...
-            %% Hawk is currently configured to wait 1000ms ( 500ms sleep, 10 attempts )
-            erlang:start_timer(1050, self(), <<"nodes">>),
-            {reply, reply_ok(), Req, State};
+            ConnectingNodesJson = connecting_nodes_json(),
+            {reply, {text, ConnectingNodesJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
-         {<<"function">>,<<"del_node">>},
-         {<<"args">>,[Node]}] ->
-            ok = crell_server:remove_node(
-                crell_web_utils:ens_atom(Node)
-            ),
+         {<<"function">>,DeleteFunc},
+         {<<"args">>,Nodes}] when DeleteFunc == <<"del_node">> orelse
+                                  DeleteFunc == <<"conn_del_node">> ->
+            ok = lists:foreach(fun(Node) ->
+                ok = crell_server:remove_node(
+                    crell_web_utils:ens_atom(Node)
+                )
+            end, Nodes),
             {reply, reply_ok(), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"non_sys_processes">>},
@@ -100,17 +106,29 @@ websocket_handle({text, ReqJson}, Req, State) ->
             {reply, {text, db_info_json(DbTypeTables)}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"dump_ets_tables">>},
-         {<<"args">>,[Node, Tbls]}] -> %% [<<"workstore">>,<<"shell_records">>]
-            io:format("Tbls : ~p~n", [Tbls]),
-            %% Make a download link to the file...
+         {<<"args">>,[Node, Tbls]}] ->
             AtomTbls = [ list_to_atom(binary_to_list(T)) || T <- Tbls ],
-            {ok, DLFilename} =
+            DLFilename =
                 crell_server:dump_ets_tables(
                     crell_web_utils:ens_atom(Node),
                     AtomTbls
                 ),
             DownloadJson = jsx:encode([{
                 <<"ets_dl_url">>,
+                crell_web_utils:ens_atom(DLFilename)
+            }]),
+            {reply, {text, DownloadJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"dump_mnesia_tables">>},
+         {<<"args">>,[Node, Tbls]}] ->
+            AtomTbls = [ list_to_atom(binary_to_list(T)) || T <- Tbls ],
+            DLFilename =
+                crell_server:dump_mnesia_tables(
+                    crell_web_utils:ens_atom(Node),
+                    AtomTbls
+                ),
+            DownloadJson = jsx:encode([{
+                <<"mnesia_dl_url">>,
                 crell_web_utils:ens_atom(DLFilename)
             }]),
             {reply, {text, DownloadJson}, Req, State};
@@ -139,8 +157,13 @@ reply_ok() ->
 %     {reply, {text, NodesJson}, Req, State};
 websocket_info({crell_notify,
                 {node_events},
-                {node_connecting,Node}}, Req, State) ->
+                {node_connecting, Node}}, Req, State) ->
     {reply, {text, jsx:encode([{<<"node_connecting">>,
+                                crell_web_utils:ens_bin(Node)}])}, Req, State};
+websocket_info({crell_notify,
+                {node_events},
+                {node_deleted, Node}}, Req, State) ->
+    {reply, {text, jsx:encode([{<<"node_deleted">>,
                                 crell_web_utils:ens_bin(Node)}])}, Req, State};
 websocket_info({crell_notify,
                 {node_events},
@@ -160,6 +183,10 @@ websocket_info(Info, Req, State) ->
 nodes_json() ->
     jsx:encode([{<<"nodes">>,
         [ Node || Node <- crell_server:nodes() ]}]).
+
+connecting_nodes_json() ->
+    jsx:encode([{<<"connecting_nodes">>,
+        [ Node || Node <- crell_server:connecting_nodes() ]}]).
 
 get_node_apps_json(Node) ->
     NodeApps = crell_server:remote_which_applications(crell_web_utils:ens_atom(Node)),
@@ -256,3 +283,4 @@ db_info_json([{mnesia, MnesiaTables} | DbTypeTables], R) ->
             %  {storage,Storage},
             %  {index,mnesia:table_info(Id, index)}
             % ],
+
