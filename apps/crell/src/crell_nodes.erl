@@ -2,23 +2,36 @@
 -record(?MODULE,{
     node,
     cookie,
-    connected = false
+    connected = false,
+    cluster_name
 }).
+
+%% Generic
 -export([
     new/2,
     create/1,
     delete/1,
     create_table/1,
     all/0,
-    obj_to_proplist/1,
-    node_disconnected/1,
-    node_connected/1
+    obj_to_proplist/1
+]).
+
+%% Specific
+-export([ all_clusters/0,
+          node_disconnected/1,
+          node_connected/1
 ]).
 
 new(Node, Cookie) ->
+    GeneratedClusterName =
+        integer_to_list(binary:decode_unsigned(crypto:strong_rand_bytes(8)), 36),
+    new(Node, Cookie, GeneratedClusterName).
+
+new(Node, Cookie, ClusterName) ->
     #?MODULE{
         node = Node,
-        cookie = Cookie
+        cookie = Cookie,
+        cluster_name = ClusterName
     }.
 
 create(Obj) ->
@@ -61,6 +74,9 @@ obj_to_proplist(Obj) ->
         {node, Obj#?MODULE.node},
         {cookie, Obj#?MODULE.cookie}
     ].
+
+all_clusters() ->
+    lists:usort([ R#?MODULE.cluster_name || R <- all() ]).
 
 node_disconnected(Key) ->
     mnesia:transaction(fun() ->

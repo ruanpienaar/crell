@@ -40,8 +40,9 @@
     toggle_tracing/0
 ]).
 
--export([inject_module/2,
-         purge_module/2
+-export([
+    inject_module/2,
+    purge_module/2
 ]).
 
 -export([
@@ -91,6 +92,9 @@ remove_node(Node) ->
 
 nodes() ->
     gen_server:call(?MODULE, nodes, infinity).
+
+clusters() ->
+    crell_nodes:all_clusters().
 
 %% TODO: could've also casted, and then sent the response with grpoc as a event.
 connecting_nodes() ->
@@ -216,7 +220,6 @@ do_get_values(Node, RemoteState, remote_which_applications) ->
 handle_call(nodes, _From, State) ->
     {reply, state_nodes(State), State};
 handle_call(connecting_nodes, _From, State) ->
-
     {reply, hawk:nodes() -- state_nodes(State), State};
 handle_call({runtime_modules, Node}, _From, State) ->
     % Update state here

@@ -1,5 +1,2 @@
 #!/bin/sh
-erl -name remotenode@localhost -setcookie remotenode -noshell -noinput -detached
-rel/crell/bin/crell start
-sleep 1
-rel/crell/bin/crell attach
+./_build/default/rel/crell_rel/bin/crell_rel console

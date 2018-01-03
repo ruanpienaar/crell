@@ -8,12 +8,13 @@
         <meta name="description" content="">
         <meta name="author" content="Ruan pienaar">
         <link rel="icon" href="favicon.ico">
-        <title>Applications</title>
+        <title>Recon</title>
         <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
         <link href="justified-nav.css" rel="stylesheet">
         <script type="text/javascript" src="angular-1.3.9/angular.min.js"></script>
         <script type="text/javascript" src="js/jquery-1.11.2.min.js"></script>
-        <script type="text/javascript" src="js/apps.js"></script>
+        <!-- <script type="text/javascript" src="js/db.js"></script> -->
+
     </head>
 
     <body ng-controller="CrellController as ctrl">
@@ -22,52 +23,31 @@
             <nav>
               <ul class="nav nav-justified">
                 <li><a href="index.html">Nodes</a></li>
-                <li class="active"><a href="application.html">Applications</a></li>
+                <li><a href="application.html">Applications</a></li>
                 <li><a href="processes.html">Processes</a></li>
                 <li><a href="sup_tree.html">Sup Tree</a></li>
                 <li><a href="db.html">DB</a></li>
                 <li><a href="modules.html">modules</a></li>
                 <li><a href="traces.html">Traces</a></li>
+                <li class="active"><a href="recon.html">Recon</a></li>
               </ul>
             </nav>
           </div>
 
         <div class="container-fluid">
-
-            <h2>Applications</h2>
+            <h2>Recon</h2>
+            <div class="form-inline">
+                <p>
+                    Existing nodes <select class="form-control" id="nodes"></select>
+                    <button id="inject">Inject Recon</button>
+                </p>
+            </div>
 
             <div class="form-inline">
-                <p>Existing nodes <select class="form-control" id="nodes"></select></p>
+                Recon
             </div>
 
-            <h3>Application consistency</h3>
-            <div>
-                <p>are threre nodes that is different?</p>
-            </div>
-
-            <h3>Application Environment variables</h3>
-            <div class="table-responsive">
-                <table class="table table-bordered table-striped">
-                    <thead>
-                        <tr>
-                            <th style="width:200px;">Name</th>
-                            <th style="width:250px;">Description</th>
-                            <th style="width:100px;">Application Version</th>
-                            <th style="width:100px;">App Env</th>
-                            <th>&nbsp;</th>
-                        </tr>
-                    </thead>
-                    <tbody id="apps_table"></tbody>
-                </table>
-            </div>
-
-         </div>
-
-        <!-- Site footer -->
-          <footer class="footer">
-            <p>&copy; Ruan Pienaar 2017</p>
-          </footer>
         </div>
-
+       </div>
     </body>
 </html>
