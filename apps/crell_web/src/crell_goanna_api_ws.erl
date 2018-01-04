@@ -206,11 +206,11 @@ get_nodes_json() ->
 active_traces_json() ->
     ActiveTracesFull = goanna_api:list_active_traces(),
     ActiveTraces =
-        lists:map(fun({{Node,TrcPattern}, TrcOpts}) ->
-            { crell_web_utils:ens_bin(TrcPattern#trc_pattern.m),
-              crell_web_utils:ens_bin(undef_function(TrcPattern#trc_pattern.f)),
-              crell_web_utils:ens_bin(undef_arity(TrcPattern#trc_pattern.a)),
-              crell_web_utils:ens_bin(io_lib:format("~p",[TrcPattern#trc_pattern.ms]))
+        lists:map(fun({{Node,{trace, [{M,F,A,MatchSpec}]}}, TrcOpts}) ->
+            { crell_web_utils:ens_bin(M),
+              crell_web_utils:ens_bin(undef_function(F)),
+              crell_web_utils:ens_bin(undef_arity(A)),
+              crell_web_utils:ens_bin(io_lib:format("~p",[MatchSpec]))
             }
         end, ActiveTracesFull),
     jsx:encode(

@@ -45,13 +45,24 @@ handle_json_path(Req, State, <<"/goanna_api/nodes">>) ->
 handle_json_path(Req, State, <<"/goanna_api/list_active_traces">>) ->
     ActiveTraces = goanna_api:list_active_traces(),
     {jsx:encode(
-        [ [{<<"node">>, crell_web_utils:ens_bin(Node)},
-           {<<"started">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
-           {<<"module">>, crell_web_utils:ens_bin(TrcPattern#trc_pattern.m)},
-           {<<"function">>, crell_web_utils:ens_bin(undef_function(TrcPattern#trc_pattern.f))},
-           {<<"arity">>, crell_web_utils:ens_bin(undef_arity(TrcPattern#trc_pattern.a))},
-           {<<"trace_opts">>, proplist_to_json_ready(TrcOpts)}
-          ] || {{Node,TrcPattern},Now,TrcOpts} <- ActiveTraces ]
+        [
+         begin 
+          {M,F,A,_MS} = 
+              case TrcPattern of
+                  {Mod} -> {Mod, undefined, undefined, undefined};
+                  {Mod,Func} -> {Mod, Func, undefined, undefined};
+                  {Mod,Func,Ari} -> {Mod, Func, Ari, undefined};
+                  {Mod,Func,Ari,MatchS} -> {Mod, Func, Ari, MatchS}
+              end,
+          [{<<"node">>, crell_web_utils:ens_bin(ChildId)},
+           %{<<"started">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
+           {<<"module">>, crell_web_utils:ens_bin(M)},
+           {<<"function">>, crell_web_utils:ens_bin(undef_function(F))},
+           {<<"arity">>, crell_web_utils:ens_bin(undef_arity(A))},
+           {<<"trace_opts">>, proplist_to_json_ready(Opts)}
+          ]
+        end
+        || {{ChildId, TrcPattern}, Opts} <- ActiveTraces ]
     ),Req,State}.
 
 terminate(normal, _Req, _State) ->
