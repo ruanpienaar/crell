@@ -30,7 +30,7 @@ routes() ->
     [
      {'_',
         [
-            {"/",cowboy_static, {priv_file, crell_web, "www/index.html"}},
+            {"/", cowboy_static, {priv_file, crell_web, "www/index.html"}},
 
             {"/crell_proc/app/:app_name/node/:node", crell_proc, []},
 
