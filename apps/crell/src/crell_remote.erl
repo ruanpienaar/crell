@@ -4,6 +4,7 @@
     init/0,
     remote_appmon_pid/1,
     remote_modules/1,
+    get_remote_module_functions/1,
     remote_applications/1,
     remote_all_env/1,
     calc_app_tree/2,
@@ -37,7 +38,10 @@ remote_modules(Dict) ->
 
 get_remote_modules() ->
     % [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
-    [{Mod, []} || {Mod, _FPath} <- code:all_loaded()].
+    [{Mod, _Functions=[]} || {Mod, _FPath} <- code:all_loaded()].
+
+get_remote_module_functions(Mod) ->
+    Mod:module_info(exports).
 
 remote_applications(Dict) ->
     dict:store(remote_running_applications, running_apps(), Dict).

@@ -16,6 +16,7 @@
     add_node/2,
     remove_node/1,
     nodes/0,
+    clusters/0,
     connecting_nodes/0,
     runtime_modules/1,
     cluster_modules/0,
@@ -171,7 +172,7 @@ init({}) ->
         NP = crell_nodes:obj_to_proplist(NodeRec),
         {node, Node} = lists:keyfind(node, 1, NP),
         {cookie, Cookie} = lists:keyfind(cookie, 1, NP),
-        ok = crell_server:add_node(Node, Cookie)
+        ok = add_node(Node, Cookie)
     end, crell_nodes:all()),
 
     {ok, #?STATE{}}.
@@ -191,14 +192,21 @@ do_get_values(_Node, RemoteState, get_remote_modules) ->
     RemoteModules = dict:fetch(remote_modules, RemoteState),
     Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, RemoteModules)),
     {ok, Mods, RemoteState};
-do_get_values(_Node, RemoteState, {get_remote_module_functions, Mod}) ->
+do_get_values(Node, RemoteState, {get_remote_module_functions, Mod}) ->
     RemoteModules = dict:fetch(remote_modules, RemoteState),
     case lists:keyfind(Mod, 1, RemoteModules) of
         false ->
             %% Maybe update when not found...
             {ok, false, RemoteState};
+        {Mod, []} ->
+            ModFunctions = rpc:call(Node, crell_remote, get_remote_module_functions, [Mod]),
+            SortedFunctions = lists:sort(ModFunctions),
+            UpdatedModFuncs = lists:keyreplace(Mod, 1, RemoteModules, {Mod, SortedFunctions}),
+            RemoteState2 = dict:store(remote_modules, UpdatedModFuncs, RemoteState),
+            {ok, SortedFunctions, RemoteState2};
+        % Hoping that the remote code, won't change too much.
         {Mod, Functions} ->
-            {ok, lists:sort(Functions), RemoteState}
+            {ok, Functions, RemoteState}
     end;
 do_get_values(Node, RemoteState, non_sys_processes) ->
     ProcList = rpc:call(Node, crell_remote, non_sys_processes, []),
@@ -237,10 +245,10 @@ handle_call(cluster_modules, _From, State) ->
     {ok, Reply, NewState} = update_state(LastNode, State, get_remote_modules),
 
     {reply, Reply, NewState};
-handle_call({cluster_module_functions,Mod}, _From, State) ->
+handle_call({cluster_module_functions, Mod}, _From, State) ->
     %% TODO: hack, just use the last Node's modules...
     LastNode = lists:last(orddict:fetch_keys(State#?STATE.nodes)),
-    {ok, Reply, NewState} = update_state(LastNode, State, {get_remote_module_functions,Mod}),
+    {ok, Reply, NewState} = update_state(LastNode, State, {get_remote_module_functions, Mod}),
     {reply, Reply, NewState};
 % handle_call({runtime_module_functions, Node, Mod}, _From, State) ->
 %     % Update state here
@@ -271,7 +279,7 @@ handle_call(E={node_connected, Node, Cookie}, _From, State) ->
     crell_notify:action({node_connecting, Node}),
     {ok, RemoteState} = start_remote_code(Node, Cookie),
     RemoteState2 = dict:store(cookie, Cookie, RemoteState),
-    crell_nodes:node_connected(Node),
+    {atomic,ok} = crell_nodes:node_connected(Node),
     crell_notify:action(E),
     {reply, ok, State#?STATE{
         nodes = orddict:store(Node, RemoteState2, State#?STATE.nodes)

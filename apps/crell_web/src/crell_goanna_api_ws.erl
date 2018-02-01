@@ -142,13 +142,13 @@ dbg_trace_format_to_json({Now, {drop, NumDropped}}) ->
      {<<"dropped">>, crell_web_utils:ens_bin(NumDropped)}].
 
 trace(BinMod,<<"*">>,BinTimeSeconds,BinMessages) ->
-    ok = goanna_api:trace_ms(binary_to_list(BinMod)++" -> return ",
-        trace_opts(BinTimeSeconds,BinMessages));
+    ok = goanna_api:update_default_trace_options(trace_opts(BinTimeSeconds,BinMessages)),
+    ok = goanna_api:trace_ms(binary_to_list(BinMod)++" -> return ");
 trace(BinMod,BinFunc,BinTimeSeconds,BinMessages) ->
-    ok = goanna_api:trace_ms(binary_to_list(BinMod)++":"++binary_to_list(BinFunc)++" -> return ",
-        trace_opts(BinTimeSeconds,BinMessages)).
+    ok = goanna_api:update_default_trace_options(trace_opts(BinTimeSeconds,BinMessages)),
+    ok = goanna_api:trace_ms(binary_to_list(BinMod)++":"++binary_to_list(BinFunc)++" -> return ").
 
-trace_opts(<<"">>,<<"">>) ->
+trace_opts(<<"">>, <<"">>) ->
     [{time, false}, {messages, false}];
 trace_opts(<<"">>, BinMessages) ->
     [{time, false}, {messages, binary_to_integer(BinMessages)}];
@@ -170,12 +170,12 @@ trace_opts(BinSecs, BinMessages) ->
 %%       {<<"mes">>,_Messages}]) ->
 %%    goanna_api:trace(crell_web_utils:ens_atom(Mod), crell_web_utils:ens_atom(Fun), crell_web_utils:ens_int(Arity)).
 
-undef_function(undefined) ->
+undef_function('_') ->
     "*";
 undef_function(F) ->
     F.
 
-undef_arity(undefined) ->
+undef_arity('_') ->
     "*";
 undef_arity(A) ->
     A.
@@ -206,11 +206,28 @@ get_nodes_json() ->
 active_traces_json() ->
     ActiveTracesFull = goanna_api:list_active_traces(),
     ActiveTraces =
-        lists:map(fun({{Node,{trace, [{M,F,A,MatchSpec}]}}, TrcOpts}) ->
+            % {
+            %     {'testnode@rpmbp©test',
+            %         {ets,all,0, [{[],[],[{exception_trace}]}]}
+            %     },
+            %     []
+            % }
+        lists:map(fun({{_Node, ActiveTrc}, _Opts}) ->
+            {M,F,A,MS} =
+                case ActiveTrc of
+                    {Module} ->
+                        {Module, '_', '_', '_'};
+                    {Module, Function} ->
+                        {Module, Function, '_', '_'};
+                    {Module, Function, Arity} ->
+                        {Module, Function, Arity, '_'};
+                    {Module, Function, Arity, MatchSpec} ->
+                        {Module, Function, Arity, MatchSpec}
+                end,
             { crell_web_utils:ens_bin(M),
               crell_web_utils:ens_bin(undef_function(F)),
               crell_web_utils:ens_bin(undef_arity(A)),
-              crell_web_utils:ens_bin(io_lib:format("~p",[MatchSpec]))
+              crell_web_utils:ens_bin(io_lib:format("~p",[MS]))
             }
         end, ActiveTracesFull),
     jsx:encode(
