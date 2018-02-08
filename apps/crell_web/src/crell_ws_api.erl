@@ -135,21 +135,35 @@ websocket_handle({text, ReqJson}, Req, State) ->
     	[{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_application_consistency">>},
          {<<"args">>,[]}] ->
-            _ConsistencyResponse = crell_server:cluster_application_consistency(),
-            _ConsistencyResponseJson  = undefined,
-            {reply, {text, <<"{}">>}, Req, State};
+            {reply, reply('cluster_application_consistency',
+                         crell_server:cluster_application_consistency()),
+                Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"recon_inj_status">>},
+         {<<"args">>,[]}] ->
+            {reply, reply('recon_inj_status',
+                          crell_server:recon_inj_status()),
+                Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"discover_neighbour_nodes">>},
+         {<<"args">>,Nodes}] ->
+            ok = crell_server:discover_neighbour_nodes(
+                [ crell_web_utils:ens_atom(Node) || Node <- Nodes ]
+            ),
+            NodesJson = nodes_json(),
+            {reply, {text, NodesJson}, Req, State};
         UnknownJson ->
             io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
             {reply, {text, Json}, Req, State}
     end.
 
+reply_ok() ->
+    reply(reply, ok).
+
 reply(Reply, Val) ->
     {text, jsx:encode([{crell_web_utils:ens_bin(Reply),
                         crell_web_utils:ens_bin(Val)}])}.
-
-reply_ok() ->
-    reply(reply, ok).
 
 % websocket_info(nodes, Req, State) ->
 %     io:format("Websocket info nodes\n"),

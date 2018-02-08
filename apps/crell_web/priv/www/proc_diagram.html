@@ -36,7 +36,7 @@ var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
 
-d3.json("http://localhost:8080/crell_process_info", function(error, graph) {
+d3.json("http://localhost:9876/crell_process_info", function(error, graph) {
 
     force.nodes(graph.nodes)
         .links(graph.links)

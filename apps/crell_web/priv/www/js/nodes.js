@@ -62,8 +62,10 @@
         } else if(json_data.hasOwnProperty('node_connected')) {
             var node = json_data.node_connected;
             $("#conn_nodes option[value='"+node+"']").remove();
-            $('#nodes').append('<option value='+node+' >'+node+'</option>');
-            $('#nodes_info_label').html('&nbsp;');
+            if( $("#nodes option[value='"+node+"']").length == 0 ){
+                $('#nodes').append('<option value='+node+' >'+node+'</option>');
+                $('#nodes_info_label').html('&nbsp;');
+            }
         } else if(json_data.hasOwnProperty('node_disconnected')) {
             var node = json_data.node_disconnected;
             $("#nodes option[value='"+node+"']").remove();
@@ -130,6 +132,20 @@
 
     $('#conn_edit_node').click(function(){
         alert('Not implemented yet.');
+    });
+
+    $('#disc_neigh_nodes').click(function(){
+        if( $('#nodes').val() != null ){
+            ws.send(JSON.stringify({'module':'crell_server',
+                                    'function':'discover_neighbour_nodes',
+                                    'args':
+                                        // not a array, since its a multiple select
+                                        $('#nodes').val()
+                                   })
+            );
+        } else {
+            alert('Select a existing node.');
+        }
     });
 
   });

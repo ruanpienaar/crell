@@ -49,7 +49,9 @@
                 $('#pids_table').append('<tr><td>'+
                     npinfo.pid+'</td><td>'+
                     npinfo.name+'</td><td>'+
-                    npinfo.mq+'</td></tr>');
+                    npinfo.mq+'</td><td>'+
+                    '<button>TODO</button></td></tr>'
+                );
             }
         }
     }

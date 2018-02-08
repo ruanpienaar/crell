@@ -6,7 +6,7 @@
 -define(SERVER, ?MODULE).
 -define(STATE, crell_server_state).
 -record(?STATE, {
-    nodes=orddict:new(),
+    nodes=orddict:new(), % orddict OF dict's (the nodes)
     tracing=false,
     cluster_modules
 }).
@@ -30,24 +30,37 @@
     calc_proc/3,
     calc_app_env/2,
     remote_which_applications/1,
-    make_xref/1,
+    next_xref_branch/1
+]).
+
+% db
+-export([
     get_db_tables/1,
     dump_ets_tables/2,
     dump_mnesia_tables/2
 ]).
 
+% tracing
 -export([
     is_tracing/0,
     toggle_tracing/0
 ]).
 
+% % inject
+% -export([
+%     inject_module/2,
+%     purge_module/2
+% ]).
+
+% cluster
 -export([
-    inject_module/2,
-    purge_module/2
+    cluster_application_consistency/0,
+    discover_neighbour_nodes/1
 ]).
 
+% recon
 -export([
-    cluster_application_consistency/0
+    recon_inj_status/0
 ]).
 
 %% TODO: choose a better data structure, or use ets...
@@ -86,7 +99,7 @@ add_node(Node, Cookie) ->
 
 remove_node(Node) ->
     {atomic, ok} = crell_nodes:delete(Node),
-    ok = purge_module(Node, crell_remote),
+    ok = spike:purge(Node, crell_remote),
     ok = hawk:remove_node(Node),
     crell_notify:action({node_deleted, Node}),
     ok.
@@ -140,7 +153,7 @@ remote_which_applications(Node) ->
    gen_server:call(?MODULE, {remote_which_applications, Node}).
 
 %% This is to follow a function to another....
-make_xref(_Node) ->
+next_xref_branch(_Node) ->
     ok.
 
 get_db_tables(Node) ->
@@ -160,6 +173,21 @@ toggle_tracing() ->
 
 cluster_application_consistency() ->
     gen_server:call(?MODULE, cluster_application_consistency).
+
+discover_neighbour_nodes(Nodes) ->
+    AllNeighbours =
+        gen_server:call(?MODULE, {discover_neighbour_nodes, Nodes}),
+    lists:foreach(fun({Node, Cookie, Neighbours}) ->
+        lists:foreach(fun(NeighbourNode) ->
+            %% TODO: maybe some nodes have diff cookies...?
+            %% might not be able to connect to the other nodes with orig cookie.
+            io:format("Adding node ~p ~p~n", [NeighbourNode, Cookie]),
+            ok = add_node(NeighbourNode, Cookie)
+        end, Neighbours)
+    end, AllNeighbours).
+
+recon_inj_status() ->
+    gen_server:call(?MODULE, recon_inj_status).
 
 %% ---------------------------------------
 
@@ -309,15 +337,6 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
     end, ok, State#?STATE.nodes),
     {reply, true, State#?STATE{ tracing = true }};
 
-handle_call(cluster_application_consistency, _From, State) ->
-    {NodeReplies, NewState} =
-        orddict:fold(fun(Node, _Value, {Replies, S}) ->
-            {ok, Reply, UpdatedState} =
-                update_state(Node, S, remote_which_applications),
-            {[Reply|Replies], UpdatedState}
-        end, {[], State}, State#?STATE.nodes),
-    % io:format("~p~n", [NodeReplies]),
-    {reply, ok, NewState};
 handle_call({get_db_tables, Node}, _From, State) ->
     Res = rpc:call(Node, crell_remote, get_db_tables, []),
     {reply, Res, State};
@@ -332,8 +351,50 @@ handle_call({dump_mnesia_tables, Node, Tables}, _From, State) ->
         rpc:call(Node, crell_remote, dump_mnesia_tables, [Tables])
     end,
     {ok, Filename} = dump_tables_to_random_file(Node, Tables, F),
-    {reply, Filename, State}.
+    {reply, Filename, State};
 
+handle_call(cluster_application_consistency, _From, State) ->
+    {NodeReplies, NewState} =
+        orddict:fold(fun(Node, _Value, {Replies, S}) ->
+            {ok, Reply, UpdatedState} =
+                update_state(Node, S, remote_which_applications),
+            {[Reply|Replies], UpdatedState}
+        end, {[], State}, State#?STATE.nodes),
+    % io:format("~p~n", [NodeReplies]),
+    {reply, ok, NewState};
+
+handle_call({discover_neighbour_nodes, AllNodes}, _From,
+        #?STATE{ nodes = Nodes } = State) ->
+    {reply,
+    lists:foldl(fun(Node, Acc) ->
+        % update_state has the same lookup.. maybe abstract into 1 func call?
+        case orddict:find(Node, Nodes) of
+            {ok, NodeDict} ->
+                Cookie = dict:fetch(cookie, NodeDict),
+                case rpc:call(Node, erlang, nodes, []) of
+                    [] ->
+                        Acc;
+                    Neighbours ->
+                        [{Node,
+                          Cookie,
+                          lists:foldl(fun(NN, Acc) ->
+                              case orddict:find(NN, Nodes) of
+                                error ->
+                                    [NN|Acc];
+                                {ok, _} ->
+                                    Acc
+                              end
+                          end, [], Neighbours)
+                         }|Acc]
+                end;
+            error ->
+                Acc
+        end
+    end, [], AllNodes),
+    State};
+
+handle_call(recon_inj_status, _From, State) ->
+    {reply, false, State}.
 %% --------------------------------------------------------------------------
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -363,7 +424,7 @@ start_remote_code(Node,_Cookie) ->
     case application:get_env(crell, remote_action) of
         {ok, 1} ->
             % try loading module
-            case inject_module(crell_remote, Node) of
+            case spike:inject(Node, crell_remote) of
                 ok -> {ok, _RemoteState} = rpc:call(Node, crell_remote, init, []);
                 _  -> {stop, enotloaded}
             end;
@@ -378,67 +439,6 @@ start_remote_code(Node,_Cookie) ->
             {ok, todo_get_remote_state};
         undefined ->
             {ok, todo_get_remote_state}
-    end.
-
--spec inject_module(ModName :: term(), NodeName :: atom()) ->
-                                        ok | {error, Reason :: term()}.
-inject_module(ModName, NodeName) ->
-    io:format("Inject the agent code into the node (NodeName=~p, "
-               "Agent=~p)~n", [NodeName, ModName]),
-    case code:get_object_code(ModName) of
-        {ModName, Bin, File} ->
-            case rpc:call(NodeName, code, load_binary,
-                          [ModName, File, Bin]) of
-                {module, ModName} ->
-                    purge_module(NodeName, ModName), % remove old code of module code
-                    io:format("Agent injected (NodeName=~p, Agent=~p)~n",
-                               [NodeName, ModName]),
-                    ok;
-                {Error, Reason} when Error =:= error;
-                                     Error =:= badrpc ->
-                    io:format("rpc(~p, code, load_binary, ...) "
-                                "failed (ModName=~p, Reason=~p)~n",
-                                [NodeName, ModName, Reason]),
-                    {error, {load_binary_failed, Reason}}
-            end;
-        error ->
-            io:format("code:get_object_code failed (ModName=~p)~n",
-                        [ModName]),
-            {error, {get_object_code_failed, ModName}}
-    end.
-
-  purge_module(Node, Module) ->
-    Res = try rpc:call(Node, code, soft_purge, [Module]) of
-              true ->
-                  ok;
-              false ->
-                  hard_purge_module(Node, Module);
-              {badrpc, _} = RPCError ->
-                  {error, RPCError}
-          catch
-              C:E ->
-                  {error, {C,E}}
-          end,
-    case Res of
-        ok ->
-            io:format("Purged ~p from ~p~n", [Module, Node]);
-        {error, Error} ->
-            io:format("Error while purging  ~p from ~p: ~p~n", [Module, Node, Error])
-    end,
-    ok.
-
-hard_purge_module(Node, Module) ->
-    try rpc:call(Node, code, purge, [Module]) of
-        true ->
-            io:format("Purging killed processes on ~p while loading ~p~n", [Node, Module]),
-            ok;
-        false ->
-            io:format("Could not code:purge ~p~n", [Module]);
-        {badrpc, _} = RPCError ->
-            {error, RPCError}
-    catch
-        C:E ->
-            {error, {C,E}}
     end.
 
 -spec abstract_code(module()) -> [erl_parse:abstract_form()].

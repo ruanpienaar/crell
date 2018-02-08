@@ -19,3 +19,5 @@ _build/
 rebar3.crashdump
 rebar.lock
 apps/crell_web/priv/www/dl/*.txt
+Mnesia/
+.tags

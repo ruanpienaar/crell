@@ -1,5 +1,5 @@
 ## Name of the node
--sname crell
+-name crell@127.0.0.1
 
 ## Cookie for distributed erlang
 -setcookie crell

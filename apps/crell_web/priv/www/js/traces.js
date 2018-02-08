@@ -228,7 +228,7 @@
 
     $('#printBtn').click(function(){
         window.print();
-    })
+    });
 
     $('#clearBtn').click(function(){
         $('#traces_table').empty();

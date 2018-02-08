@@ -1,4 +1,7 @@
-.PHONY: release compile test clean dialyzer rebar3
+.PHONY: console release compile test clean dialyzer rebar3
+
+console: release
+	@./_build/default/rel/crell_rel/bin/crell_rel console
 
 release: compile
 	@./rebar3 release

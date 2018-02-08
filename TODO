@@ -6,4 +6,4 @@
  ☐ replace JSX with jiffy
  ☐ rename crell_goanna_api_ws TO crell_goanna_ws_api
  ☐ make make goanna active traces store the active traces as {module, '_', '_', '_'} rather than {module}
- ☐
+ ☐ add multiple
