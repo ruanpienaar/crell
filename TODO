@@ -3,7 +3,6 @@
  ☐ don't show applications in sup_tree that does not have any children IE children == [].
  ☐ [ISSUE] - remove node not working ( crell_server still has them in state
  ☐ [ISSUE] - export mnesia tables causes a big printout of mnesia info
- ☐ replace JSX with jiffy
  ☐ rename crell_goanna_api_ws TO crell_goanna_ws_api
  ☐ make make goanna active traces store the active traces as {module, '_', '_', '_'} rather than {module}
  ☐ add multiple

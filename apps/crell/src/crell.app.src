@@ -10,7 +10,6 @@
                   ranch,
                   cowlib,
                   cowboy,
-                  jiffy,
                   goanna,
                   crell_crawl
                  ]},
