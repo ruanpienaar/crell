@@ -21,3 +21,4 @@ rebar.lock
 apps/crell_web/priv/www/dl/*.txt
 Mnesia/
 .tags
+rebar3
