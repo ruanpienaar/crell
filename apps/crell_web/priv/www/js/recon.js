@@ -48,7 +48,7 @@
             //     $('#mods_table').append('<tr><td>'+
             //         json_data.mods[n]+'</td></tr>');
             // }
-            alert(' Recon Injected Status '+json_data.recon_inj_status);
+            //alert(' Recon Injected Status '+json_data.recon_inj_status);
         }
     }
 

@@ -90,10 +90,11 @@ add_node(Node, Cookie) ->
                     {ok,updated} = hawk:add_disconnect_callback(Node, {ND,DCB}),
                     ok
             end;
-        false ->
+        {error, no_such_node} ->
             {ok,_} = hawk:add_node(Node, Cookie, ConnectedCallBack, DisconnCallBack),
             ok;
-        {error,connecting} ->
+        {error, connecting} ->
+            %% TODO: log that the node is connecting..
             ok
     end.
 
