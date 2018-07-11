@@ -86,8 +86,8 @@ add_node(Node, Cookie) ->
                     [{NC,CCB}] = ConnectedCallBack,
                     [{ND,DCB}] = DisconnCallBack,
                     CCB(),
-                    {ok,updated} = hawk:add_connect_callback(Node, {NC,CCB}),
-                    {ok,updated} = hawk:add_disconnect_callback(Node, {ND,DCB}),
+                    {ok,{_, updated}} = hawk:add_connect_callback(Node, {NC,CCB}),
+                    {ok,{_, updated}} = hawk:add_disconnect_callback(Node, {ND,DCB}),
                     ok
             end;
         {error, no_such_node} ->
@@ -333,7 +333,7 @@ handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
         Cookie = dict:fetch(cookie, NodeDict),
         % io:format("Enable tracing on : ~p~n", [Node]),
         % {error,{already_started,P}} = goanna_api:add_node(Node,Cookie,tcpip_port),
-        {ok,updated} = goanna_api:add_node_callbacks(Node, Cookie),
+        ok = goanna_api:add_node_callbacks(Node, Cookie),
         ok
     end, ok, State#?STATE.nodes),
     {reply, true, State#?STATE{ tracing = true }};

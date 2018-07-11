@@ -473,7 +473,7 @@ get_db_tables() ->
 %% COPIED FROM observer_backend.erl ( from runtime_tools )
 tables(ets) ->
     Opts = [{unread_hidden, true},
-            {sys_hidden, false}
+            {sys_hidden, true}
     ],
     HideUnread = proplists:get_value(unread_hidden, Opts, true),
     HideSys = proplists:get_value(sys_hidden, Opts, true),
@@ -486,7 +486,7 @@ tables(ets) ->
                 end,
             Name = ets:info(Id, name),
             Protection = ets:info(Id, protection),
-            ignore(HideUnread andalso Protection == private, unreadable),
+            ignore(HideUnread andalso Protection /= public, unreadable),
             Owner = ets:info(Id, owner),
             RegName =
                 case catch process_info(Owner, registered_name) of
@@ -519,7 +519,7 @@ tables(ets) ->
     end,
     lists:foldl(Fun, [], ets:all());
 tables(mnesia) ->
-    Opts = [{sys_hidden, false}
+    Opts = [{sys_hidden, true}
     ],
     HideSys = proplists:get_value(sys_hidden, Opts, true),
     Owner = ets:info(schema, owner),
@@ -628,7 +628,6 @@ try_dump_ets(Table) ->
     end.
 
 dump_mnesia_tables(Tables) ->
-    mnesia:info(),
     L = lists:map(fun(Table) ->
         {atomic, Res} = mnesia:transaction(fun() ->
             reading_mnesia_entries(Table)

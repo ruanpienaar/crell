@@ -5,7 +5,6 @@
 -export([websocket_handle/3]).
 -export([websocket_info/3]).
 
-
 -define(STATE, crell_ws_api).
 -record(?STATE, {}).
 
@@ -152,6 +151,32 @@ websocket_handle({text, ReqJson}, Req, State) ->
             ),
             NodesJson = nodes_json(),
             {reply, {text, NodesJson}, Req, State};
+        [{<<"module">>,<<"crell_db">>},
+         {<<"function">>,<<"ets_entries_per_page">>},
+         {<<"args">>,[Node, Tbl, PageNmr]}] ->
+            KeysJson =
+                ets_record_json(
+                    crell_db:ets_entries_per_page(
+                        crell_web_utils:ens_atom(Node),
+                        crell_web_utils:ens_atom(Tbl),
+                        crell_web_utils:ens_int(PageNmr)
+                    ),
+                    PageNmr
+                ),
+            {reply, {text, KeysJson}, Req, State};
+        [{<<"module">>,<<"crell_db">>},
+         {<<"function">>,<<"mnesia_entries_per_page">>},
+         {<<"args">>,[Node, Tbl, PageNmr]}] ->
+            KeysJson =
+                mnesia_record_json(
+                    crell_db:mnesia_entries_per_page(
+                        crell_web_utils:ens_atom(Node),
+                        crell_web_utils:ens_atom(Tbl),
+                        crell_web_utils:ens_int(PageNmr)
+                    ),
+                    PageNmr
+                ),
+            {reply, {text, KeysJson}, Req, State};
         UnknownJson ->
             io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
@@ -255,7 +280,10 @@ db_info_json([{ets, EtsTables} | DbTypeTables], R) ->
         lists:map(fun(TableProplist) ->
             % io:format("TBL:~p~n~n", [TableProplist]),
             {name, Name} = lists:keyfind(name, 1, TableProplist),
-            Name
+            {size, Size} = lists:keyfind(size, 1, TableProplist),
+            [{<<"name">>, Name},
+             {<<"size">>, Size}
+            ]
         end, EtsTables),
     db_info_json(DbTypeTables, [{<<"ets_tables">>, EtsTblNames} | R]);
 db_info_json([{mnesia, []} | DbTypeTables], R) ->
@@ -266,7 +294,10 @@ db_info_json([{mnesia, MnesiaTables} | DbTypeTables], R) ->
         lists:map(fun(TableProplist) ->
             % io:format("TBL:~p~n~n", [TableProplist]),
             {name, Name} = lists:keyfind(name, 1, TableProplist),
-            Name
+            {size, Size} = lists:keyfind(size, 1, TableProplist),
+            [{<<"name">>, Name},
+             {<<"size">>, Size}
+            ]
         end, MnesiaTables),
     db_info_json(DbTypeTables, [{<<"mnesia_tables">>, MnesiaTblNames} | R]).
 
@@ -298,3 +329,43 @@ db_info_json([{mnesia, MnesiaTables} | DbTypeTables], R) ->
             %  {index,mnesia:table_info(Id, index)}
             % ],
 
+%% TODO: unify this shity copy paste effort
+
+ets_record_json({RecordCount, Records}, PageNmr) ->
+    ets_record_json(RecordCount, Records, [], PageNmr).
+
+ets_record_json(RecordCount, [], R, PageNmr) ->
+    L = lists:reverse(R),
+    jsx:encode(
+        [ {<<"ets_records">>,
+            [{<<"count">>, crell_web_utils:ens_bin(RecordCount)},
+             {<<"records">>, L}
+            ]
+          },
+          {<<"PageNmr">>, crell_web_utils:ens_bin(PageNmr)}
+        ]
+    );
+ets_record_json(RecordCount, [H|T], R, PageNmr) ->
+    ets_record_json(RecordCount, T, [ crell_web_utils:ens_bin(H) | R ], PageNmr).
+
+
+mnesia_record_json({badrpc, Reason}, _) ->
+    jsx:encode([
+        {<<"mnesia_records_error">>, crell_web_utils:ens_bin(Reason)}
+    ]);
+mnesia_record_json({RecordCount, Records}, PageNmr) ->
+    mnesia_record_json(RecordCount, Records, [], PageNmr).
+
+mnesia_record_json(RecordCount, [], R, PageNmr) ->
+    L = lists:reverse(R),
+    jsx:encode(
+        [ {<<"mnesia_records">>,
+            [{<<"count">>, crell_web_utils:ens_bin(RecordCount)},
+             {<<"records">>, L}
+            ]
+          },
+          {<<"PageNmr">>, crell_web_utils:ens_bin(PageNmr)}
+        ]
+    );
+mnesia_record_json(RecordCount, [H|T], R, PageNmr) ->
+    mnesia_record_json(RecordCount, T, [ crell_web_utils:ens_bin(H) | R ], PageNmr).

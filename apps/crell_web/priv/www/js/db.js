@@ -48,10 +48,12 @@
             $('#ets_db_tables').empty();
             var db_tables = json_data.db_tables;
             for(var e in db_tables.ets_tables){
-                etbl = db_tables.ets_tables[e];
+                var etbl = db_tables.ets_tables[e].name;
+                var etbl_size = db_tables.ets_tables[e].size;
+                var etbl_u = encodeURI(etbl);
                 $('#ets_db_tables').append(
                     '<tr><td>'+ets_exp_chk(etbl)+'</td>'+
-                    '<td>'+etbl+'</td></tr>');
+                    '<td><a href="db_view_ets.html?tbl='+etbl_u+'">'+etbl+' - '+etbl_size+' Records</a></td></tr>');
             }
 
             // handle mnesia, if mnesia is started.
@@ -60,10 +62,12 @@
                 //alert(' has mnesia tables');
                 var db_tables = json_data.db_tables;
                 for(var m in db_tables.mnesia_tables){
-                    mtbl = db_tables.mnesia_tables[m];
+                    var mtbl = db_tables.mnesia_tables[m].name;
+                    var mtbl_size = db_tables.mnesia_tables[m].size;
+                    var mnesia_tbl_u = encodeURI(mtbl);
                     $('#mnesia_db_tables').append(
                         '<tr><td>'+mnesia_exp_chk(mtbl)+'</td>'+
-                        '<td>'+mtbl+'</td></tr>');
+                        '<td><a href="db_view_mnesia.html?tbl='+mnesia_tbl_u+'">'+mtbl+' - '+mtbl_size+' Records<a></td></tr>');
                 }
             } else {
                 $('#mnesia_db_tables').append(
@@ -78,6 +82,10 @@
             window.location = dl;
         }
     }
+
+    $('#nodes').change(function(){
+        get_db_tables($('#nodes').val());
+    });
 
     function ets_exp_chk(ets_tbl_name){
         return '<input class="ets-form-check-input form-check-input"'+

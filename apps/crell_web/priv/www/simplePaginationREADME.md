@@ -1,0 +1,1 @@
+https://github.com/ruanpienaar/simplePagination.js

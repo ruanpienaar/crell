@@ -12,7 +12,9 @@ ens_bin(V) when is_list(V) ->
 ens_bin(V) when is_binary(V) ->
     V;
 ens_bin(V) when is_integer(V) ->
-    list_to_binary(integer_to_list(V)).
+    list_to_binary(integer_to_list(V));
+ens_bin(V) when is_tuple(V) ->
+    ens_bin(io_lib:format("~p", [V])).
 
 ens_atom(V) when is_list(V) ->
     list_to_atom(V);

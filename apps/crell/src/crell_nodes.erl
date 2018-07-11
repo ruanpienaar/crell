@@ -48,10 +48,10 @@ create_table(Nodes) ->
             {atomic,ok} =
                 mnesia:create_table(
                         ?MODULE,
-                        [{type,set},
-                         {disc_only_copies,Nodes},
-                         {attributes,record_info(fields, ?MODULE)},
-                         {majority, true}
+                        [{type, set},
+                         {disc_copies, Nodes},
+                         {attributes, record_info(fields, ?MODULE)},
+                         {majority, false}
                        ]);
         C:E ->
             throw({stop,[{c,C},{e,E}]})
