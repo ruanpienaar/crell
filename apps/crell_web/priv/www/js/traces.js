@@ -284,7 +284,7 @@
                 table_row=
                 '<tr>'+
                 ' <th scope="row">'+obj['datetime']+'</th>'+
-                ' <td>'+obj['pid']+'</td>'+
+                ' <td>'+obj.node+'</td>'+
                 ' <td>'+obj['label']+'</td>'+
                 ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
                 '</tr>';
@@ -294,7 +294,7 @@
                 table_row=
                 '<tr>'+
                 ' <th scope="row">'+obj['datetime']+'</th>'+
-                ' <td>'+obj['pid']+'</td>'+
+                ' <td>'+obj.node+'</td>'+
                 ' <td>'+obj['label']+'</td>'+
                 ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
                 ' <td><pre><code class="erlang">'+obj['extra']+'</code></pre></td>'+

@@ -10,7 +10,7 @@
 
 init(Req, _Opts) ->
     true = crell_notify:subscribe({node_events}),
-    process_flag(trap_exit, true),
+    % process_flag(trap_exit, true),
     {cowboy_websocket, Req, #?STATE{}}.
 
 websocket_handle({text, ReqJson}, Req, State) ->

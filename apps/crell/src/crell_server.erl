@@ -321,19 +321,17 @@ handle_call(is_tracing, _From, State) ->
 %% TODO: maybe add some more conditions,
 handle_call(toggle_tracing, _From, #?STATE{tracing=true} = State) ->
     ok = orddict:fold(fun(Node,NodeDict,ok) ->
-        % io:format("Disable tracing on : ~p~n", [Node]),
-        ok = goanna_api:stop_trace(),
-        true = goanna_api:remove_goanna_callbacks(Node),
-        ok = goanna_api:remove_goanna_node(Node)
+        % Don't match  on these calls, nodes could be added while other nodes are tracing
+        goanna_api:stop_trace(),
+        goanna_api:remove_goanna_callbacks(Node),
+        goanna_api:remove_goanna_node(Node),
+        ok
     end, ok, State#?STATE.nodes),
     {reply, false, State#?STATE{ tracing = false }};
 handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
     ok = orddict:fold(fun(Node,NodeDict,ok) ->
-        % io:format("Node:~p~n", [Node])
         Cookie = dict:fetch(cookie, NodeDict),
-        % io:format("Enable tracing on : ~p~n", [Node]),
-        % {error,{already_started,P}} = goanna_api:add_node(Node,Cookie,tcpip_port),
-        ok = goanna_api:add_node_callbacks(Node, Cookie),
+        goanna_api:add_node_callbacks(Node, Cookie),
         ok
     end, ok, State#?STATE.nodes),
     {reply, true, State#?STATE{ tracing = true }};

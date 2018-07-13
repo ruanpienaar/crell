@@ -12,7 +12,7 @@
 
 
 init(Req, Opts) ->
-    process_flag(trap_exit, true),
+    %process_flag(trap_exit, true),
     {cowboy_websocket, Req, #?STATE{}}.
 
 websocket_handle({text, ReqJson}, Req, State) ->
@@ -44,10 +44,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[TrcPattern]}] ->
-            [M, F, A] = trcpat_mfa_to_str(TrcPattern),
-            %% TODO: handle * as all arity, so call, stop_trace(M,F)
-            io:format("~p",[ [M, F, A] ]),
-            ok = goanna_api:stop_trace(M, F, A),
+            ok = stop_trace(trcpat_str_to_stop_mfa(TrcPattern)),
             Json = active_traces_json(),
             {reply, {text, Json}, Req, State};
         [{<<"module">>,<<"goanna_api">>},
@@ -110,34 +107,39 @@ ensure_info(T) ->
 ensure_extra(T) ->
     crell_web_utils:ens_bin(io_lib:format("~p", [T])).
 
-dbg_trace_format_to_json({Now, {T, Pid, Label, Info}}) when T==trace ->
+dbg_trace_format_to_json({Now, Node, {T, Pid, Label, Info}}) when T==trace ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
+     {<<"node">>, crell_web_utils:ens_bin(Node)},
      {<<"type">>, crell_web_utils:ens_bin(trace)},
      {<<"pid">>, crell_web_utils:ens_bin(Pid)},
      {<<"label">>, crell_web_utils:ens_bin(Label)},
      {<<"info">>, ensure_info(Info)}];
-dbg_trace_format_to_json({Now, {T, Pid, Label, Info, Extra}}) when T==trace ->
+dbg_trace_format_to_json({Now, Node, {T, Pid, Label, Info, Extra}}) when T==trace ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
+     {<<"node">>, crell_web_utils:ens_bin(Node)},
      {<<"type">>, crell_web_utils:ens_bin(trace_extra)},
      {<<"pid">>, crell_web_utils:ens_bin(Pid)},
      {<<"label">>, crell_web_utils:ens_bin(Label)},
      {<<"info">>, ensure_info(Info)},
      {<<"extra">>, ensure_extra(Extra)}];
-dbg_trace_format_to_json({Now, {T, Pid, Label, Info, _Timestamp}}) when T==trace_ts ->
+dbg_trace_format_to_json({Now, Node, {T, Pid, Label, Info, _Timestamp}}) when T==trace_ts ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
+     {<<"node">>, crell_web_utils:ens_bin(Node)},
      {<<"type">>, crell_web_utils:ens_bin(trace)},
      {<<"pid">>, crell_web_utils:ens_bin(Pid)},
      {<<"label">>, crell_web_utils:ens_bin(Label)},
      {<<"info">>, ensure_info(Info)}];
-dbg_trace_format_to_json({Now, {T, Pid, Label, Info, Extra, _Timestamp}}) when T==trace_ts ->
+dbg_trace_format_to_json({Now, Node, {T, Pid, Label, Info, Extra, _Timestamp}}) when T==trace_ts ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
+     {<<"node">>, crell_web_utils:ens_bin(Node)},
      {<<"type">>, crell_web_utils:ens_bin(trace_extra)},
      {<<"pid">>, crell_web_utils:ens_bin(Pid)},
      {<<"label">>, crell_web_utils:ens_bin(Label)},
      {<<"info">>, ensure_info(Info)},
      {<<"extra">>, ensure_extra(Extra)}];
-dbg_trace_format_to_json({Now, {drop, NumDropped}}) ->
+dbg_trace_format_to_json({Now, Node, {drop, NumDropped}}) ->
     [{<<"datetime">>, crell_web_utils:ens_bin(crell_web_utils:localtime_ms_str(Now))},
+     {<<"node">>, crell_web_utils:ens_bin(Node)},
      {<<"type">>, crell_web_utils:ens_bin(drop)},
      {<<"dropped">>, crell_web_utils:ens_bin(NumDropped)}].
 
@@ -185,13 +187,19 @@ proplist_to_json_ready(Props) ->
         [KVPair]
     end, Props).
 
-trcpat_mfa_to_str(Mfa) ->
-    [M, F, A] = string:tokens(binary_to_list(Mfa), ":/"),
-    [crell_web_utils:ens_atom(M), crell_web_utils:ens_atom(F), crell_web_utils:ens_int(A)].
+trcpat_str_to_stop_mfa(Mfa) ->
+    case string:tokens(binary_to_list(Mfa), ":/") of
+        [M, [$*], [$*]] ->
+            [crell_web_utils:ens_atom(M)];
+        [M, F, [$*]] ->
+            [crell_web_utils:ens_atom(M), crell_web_utils:ens_atom(F)];
+        [M, F, A] ->
+            [crell_web_utils:ens_atom(M), crell_web_utils:ens_atom(F), crell_web_utils:ens_int(A)]
+    end.
 
-trcpat_fa_to_str(Fa)->
-    [F, A] = string:tokens(binary_to_list(Fa), "/"),
-    [crell_web_utils:ens_atom(F), crell_web_utils:ens_int(A)].
+% trcpat_fa_to_str(Fa) ->
+%     [F, A] = string:tokens(binary_to_list(Fa), "/"),
+%     [crell_web_utils:ens_atom(F), crell_web_utils:ens_int(A)].
 
 get_nodes_json() ->
     Nodes = goanna_api:nodes(),
@@ -246,3 +254,10 @@ active_traces_json() ->
 
     polling_end_json() ->
         jsx:encode([{<<"traces_polling_end">>, <<"true">>}]).
+
+stop_trace([M]) ->
+    ok = goanna_api:stop_trace(M);
+stop_trace([M ,F]) ->
+    ok = goanna_api:stop_trace(M, F);
+stop_trace([M ,F, A]) ->
+    ok = goanna_api:stop_trace(M, F, A).
