@@ -14,7 +14,7 @@ init(Req, _Opts) ->
     {cowboy_websocket, Req, #?STATE{}}.
 
 websocket_handle({text, ReqJson}, Req, State) ->
-    case jsx:decode(ReqJson) of
+    case jsx:decode(ReqJson, [{return_maps, false}]) of
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"nodes">>},
          {<<"args">>,[]}] ->

@@ -16,7 +16,7 @@ init(Req, Opts) ->
     {cowboy_websocket, Req, #?STATE{}}.
 
 websocket_handle({text, ReqJson}, Req, State) ->
-    case jsx:decode(ReqJson) of
+    case jsx:decode(ReqJson, [{return_maps, false}]) of
         [{<<"polling">>,<<"true">>}] ->
             poller(100),
             {reply, {text, <<"ok">>}, Req, State#?STATE{ polling = true }};
@@ -145,10 +145,10 @@ dbg_trace_format_to_json({Now, Node, {drop, NumDropped}}) ->
 
 trace(BinMod,<<"*">>,BinTimeSeconds,BinMessages) ->
     ok = goanna_api:update_default_trace_options(trace_opts(BinTimeSeconds,BinMessages)),
-    ok = goanna_api:trace_ms(binary_to_list(BinMod)++" -> return ");
+    ok = goanna_api:trace_ms("'"++binary_to_list(BinMod)++"' -> return ");
 trace(BinMod,BinFunc,BinTimeSeconds,BinMessages) ->
     ok = goanna_api:update_default_trace_options(trace_opts(BinTimeSeconds,BinMessages)),
-    ok = goanna_api:trace_ms(binary_to_list(BinMod)++":"++binary_to_list(BinFunc)++" -> return ").
+    ok = goanna_api:trace_ms("'"++binary_to_list(BinMod)++"':"++binary_to_list(BinFunc)++" -> return ").
 
 trace_opts(<<"">>, <<"">>) ->
     [{time, false}, {messages, false}];
