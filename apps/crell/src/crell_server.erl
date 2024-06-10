@@ -314,15 +314,14 @@ handle_call({module_source, Node, Module}, _From, State) ->
     %         logger:error(#{error => X }),
     %         {ok, <<"error">>}
     % end,
-    {ok, CodeString} =
+    Code =
         case rpc:call(Node, crell_remote, get_source, [Module]) of
             {ok, S} ->
-                {ok, S};
-            E ->
-                {ok, E}
+                list_to_binary(S);
+            {error, E} ->
+                list_to_binary(io_lib:format("error ~p", [E]))
         end,
-    Source = list_to_binary(CodeString),
-    {reply, {ok, Source}, State};
+    {reply, {ok, Code}, State};
 handle_call({non_sys_processes, Node}, _From, State) ->
     % Update state here
     {ok, Reply, _} = update_state(Node, State, non_sys_processes),

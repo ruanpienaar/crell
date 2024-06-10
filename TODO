@@ -1,4 +1,4 @@
-
+ ☐
  TODO:
  ☐ don't show applications in sup_tree that does not have any children IE children == [].
  ☐ [ISSUE] - remove node not working ( crell_server still has them in state
@@ -7,3 +7,4 @@
  ☐ make make goanna active traces store the active traces as {module, '_', '_', '_'} rather than {module}
  ☐ add multiple
  ☐ check the rr(Mod) code, to improve the db export functionality
+ ☐ bump cowboy version

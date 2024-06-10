@@ -672,27 +672,39 @@ mread(T, K) ->
 get_source(What) ->
     try
         case What of
-                {M,F,A} ->
-                        {ok, fun_src(M,F,A)};
-                Mod when is_atom(Mod)->
-                        {ok, mod_src(Mod)}
+            {M,F,A} ->
+                fun_src(M,F,A);
+            Mod when is_atom(Mod)->
+                mod_src(Mod)
         end
-        catch _:E:S ->
-                {error, {E, S}}
+    catch _:E:S ->
+            {error, {E, S}}
     end.
 
 -spec abstract_code(module()) -> [erl_parse:abstract_form()].
 abstract_code(Module) ->
-    File = code:which(Module),
-    logger:info(#{ code_which => File }),
-    {ok,{_Mod,[{abstract_code,{_Version,Forms}}]}} = beam_lib:chunks(File, [abstract_code]),
-    Forms.
+    case code:which(Module) of
+        preloaded ->
+            % TODO: we'll need to read the .erl somehow...
+            {error, preloaded};
+        File ->
+            {ok, {_Mod, [{abstract_code, {_Version, Forms}}]}} = beam_lib:chunks(File, [abstract_code]),
+            {ok, Forms}
+    end.
 
 mod_src(Module) ->
-    Forms = abstract_code(Module),
-    lists:flatten([[erl_pp:form(F),$\n] || F <- Forms, element(1,F) =:= attribute orelse element(1,F) =:= function]).
+    case abstract_code(Module) of
+        {error, E} ->
+            {error, E};
+        {ok, Forms} ->
+            {ok, lists:flatten([[erl_pp:form(F),$\n] || F <- Forms, element(1,F) =:= attribute orelse element(1,F) =:= function])}
+    end.
 
 fun_src(Mod, Fun, Arity) ->
-    Forms = abstract_code(Mod),
-    [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
-    lists:flatten(erl_pp:form(FF)).
+    case abstract_code(Mod) of
+        {error, E} ->
+            {error, E};
+        Forms ->
+            [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
+            {ok, lists:flatten(erl_pp:form(FF))}
+    end.
