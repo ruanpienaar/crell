@@ -22,8 +22,6 @@ content_types_provided(Req, State) ->
     {[{<<"application/json">>, handle_json}], Req, State}.
 
 handle_json(Req, State) ->
-    % Data = crell_server:calc_app_env(State#?STATE.app_name),
-    % Json = to_json(State#?STATE.app_name, Data),
     Json = to_json(),
     {Json,Req,State}.
 

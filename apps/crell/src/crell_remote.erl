@@ -1,9 +1,16 @@
 -module(crell_remote).
+
+% TODO: Don't use dict.
+%
+
+-include_lib("kernel/include/logger.hrl").
+
 -record(db, {q, p, links, links2}).
 -export([
     init/0,
     remote_appmon_pid/1,
     remote_modules/1,
+        get_remote_modules2/0, %% New export. cleaup later.
     get_remote_module_functions/1,
     remote_applications/1,
     remote_all_env/1,
@@ -13,7 +20,8 @@
     get_app_env/0,
     get_db_tables/0,
     dump_ets_tables/1,
-    dump_mnesia_tables/1
+    dump_mnesia_tables/1,
+    get_source/1
 ]).
 %%----------------------------------------------------------------------
 
@@ -36,9 +44,17 @@ remote_appmon_pid(Dict) ->
 remote_modules(Dict) ->
     dict:store(remote_modules, get_remote_modules(), Dict).
 
+% TODO: Potential Deprecate:
 get_remote_modules() ->
     % [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
     [{Mod, _Functions=[]} || {Mod, _FPath} <- code:all_loaded()].
+
+get_remote_modules2() ->
+    erlang:term_to_binary(
+        [
+            {Mod, Mod:module_info()}
+        || {Mod, _FPath} <- code:all_loaded()]
+    ).
 
 get_remote_module_functions(Mod) ->
     Mod:module_info(exports).
@@ -622,8 +638,8 @@ try_dump_ets(Table) ->
     try
         list_to_binary(io_lib:format("~p~n", [{Table, ets:tab2list(Table)}]))
     catch
-        C:E ->
-            R={Table, {C, E, erlang:get_stacktrace()}},
+        C:E:S ->
+            R={Table, {C, E, S}},
             list_to_binary( io_lib:format("~p~n", [R]) )
     end.
 
@@ -651,5 +667,32 @@ reading_mnesia_entries(Table, Key, R) ->
     ).
 
 mread(T, K) ->
-    [V] = mnesia:read(T, K),
-    V.
+    hd(mnesia:read(T, K)).
+
+get_source(What) ->
+    try
+        case What of
+                {M,F,A} ->
+                        {ok, fun_src(M,F,A)};
+                Mod when is_atom(Mod)->
+                        {ok, mod_src(Mod)}
+        end
+        catch _:E:S ->
+                {error, {E, S}}
+    end.
+
+-spec abstract_code(module()) -> [erl_parse:abstract_form()].
+abstract_code(Module) ->
+    File = code:which(Module),
+    logger:info(#{ code_which => File }),
+    {ok,{_Mod,[{abstract_code,{_Version,Forms}}]}} = beam_lib:chunks(File, [abstract_code]),
+    Forms.
+
+mod_src(Module) ->
+    Forms = abstract_code(Module),
+    lists:flatten([[erl_pp:form(F),$\n] || F <- Forms, element(1,F) =:= attribute orelse element(1,F) =:= function]).
+
+fun_src(Mod, Fun, Arity) ->
+    Forms = abstract_code(Mod),
+    [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
+    lists:flatten(erl_pp:form(FF)).

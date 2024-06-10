@@ -1,4 +1,7 @@
 -module(crell_mods).
+
+-include_lib("kernel/include/logger.hrl").
+
 -export([
     all/0,
     find/1,
@@ -29,10 +32,9 @@ module_edges(XServ, Module) ->
         QueryStr = lists:flatten( io_lib:format("E | ['~p']",[Module]) ),
         {ok,Edges} = xref:q(XServ, QueryStr)
     catch
-        C:E ->
-            ST = erlang:get_stacktrace(),
-            io:format("~p got ~p, ~p\n~p\n",[C,E,ST]),
-            {error,[{c,C},{e,E},{stacktrace,ST}]}
+        C:E:S ->
+            logger:error(#{ c => C, e => E, s => S}),
+            {error,[{c,C},{e,E},{stacktrace,S}]}
     end.
 
 initialize_xref(Name, Options) ->

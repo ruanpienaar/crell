@@ -1,5 +1,6 @@
 -module(crell_goanna_api_ws).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("goanna/include/goanna.hrl").
 
 -export([init/2]).
@@ -53,12 +54,12 @@ websocket_handle({text, ReqJson}, Req, State) ->
             Json = active_traces_json(),
             {reply, {text, Json}, Req, State};
         UnknownJson ->
-            io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
+            logger:error(#{ unknown_json => UnknownJson }),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
             {reply, {text, Json}, Req, State}
     end;
 websocket_handle(Data, Req, State) ->
-    io:format("websocket_handle : ~p\n\n", [Data]),
+    logger:error(#{ websocket_handle => Data }),
     {ok, Req, State}.
 
 websocket_info({timeout, _Ref, <<"list_active_traces">>}, Req,
@@ -87,7 +88,7 @@ websocket_info({timeout, _Ref, {<<"fetch">>, Ms}}, Req, #?STATE{ polling = true 
         end,
     {reply, {text, Json}, Req, State};
 websocket_info(Info, Req, State) ->
-    io:format("~p~n", [Info]),
+    logger:error(#{ websocket_info => Info }),
     {ok, Req, State}.
 
 poller(Ms) ->

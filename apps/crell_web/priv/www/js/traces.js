@@ -256,22 +256,22 @@
     });
 
     $('#enable_trc_btn').click(function(){
-        ws.send(JSON.stringify({'module':'crell_server',
-                                'function':'toggle_tracing',
-                                'args':
-                                    []
-                               })
-        );
+        toggle_tracing_ws_msg(ws)
     });
     $('#disable_trc_btn').click(function(){
-        reset_inputs();
+        reset_inputs()
+        toggle_tracing_ws_msg(ws)
+
+    });
+
+    function toggle_tracing_ws_msg(ws) {
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'toggle_tracing',
                                 'args':
-                                    []
+                                    [$('#nodes').val()]
                                })
-        );
-    });
+        )
+    }
 
 // function message(string){
 //     console.log(string);

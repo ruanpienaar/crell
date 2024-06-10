@@ -28,6 +28,7 @@
     function handle_message(msg) {
         var json_data = JSON.parse(msg.data);
         if(json_data.hasOwnProperty('nodes')) {
+            // TODO: fix this copy paste code
             if(json_data.nodes.length == 0){
                 alert('First add a node.');
                 window.location.href = 'index.html'
@@ -54,6 +55,7 @@
                     '<button onclick="get_app_env(\''+napp.name+'\')">Get App Env</button></td>'+
                     '<td id="'+napp.name+'">&nbsp;</td></tr>'
                 );
+                get_app_env(napp.name);
             }
         } else if (json_data.hasOwnProperty('app_envs')) {
             var a = json_data.app_name;
@@ -83,6 +85,7 @@
         get_application($('#nodes').val());
     });
 
+    // TODO: make MFA into JS function
     $scope.get_app_env = function(app_name){
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'calc_app_env',

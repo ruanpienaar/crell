@@ -1,6 +1,6 @@
 {application, crell,
  [
-  {description, ""},
+  {description, "crell erlang observability/debugging tool"},
   {vsn, "1"},
   {registered, []},
   {applications, [kernel,

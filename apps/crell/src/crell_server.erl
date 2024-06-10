@@ -1,10 +1,25 @@
+% TODO: Start crell server per node
+% TODO: make crell_server configurable:
+%   poll_server&no-inject
+%   call_remote&inject
+%
 -module (crell_server).
 
--behaviour(gen_server).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-include_lib("kernel/include/logger.hrl").
 
--define(SERVER, ?MODULE).
+-behaviour(gen_server).
+
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
+
 -define(STATE, crell_server_state).
+% TODO: change tracing from boolean to map #{Node => TracingBool, Node2 => Bool }
 -record(?STATE, {
     nodes=orddict:new(), % orddict OF dict's (the nodes)
     tracing=false,
@@ -22,7 +37,7 @@
     cluster_modules/0,
     cluster_module_functions/1,
     % runtime_module_functions/2,
-    %module_source/2,
+    module_source/2,
     non_sys_processes/1,
     calc_app/2,
     calc_app/3,
@@ -43,7 +58,8 @@
 % tracing
 -export([
     is_tracing/0,
-    toggle_tracing/0
+    toggle_tracing/1
+    % toggle_cluster_tracing/1
 ]).
 
 % % inject
@@ -67,7 +83,7 @@
 %% The orddict, is not coping with the amounts of data from the module function exports...
 
 start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, {}, []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, {}, []).
 
 
 %% TODO: extremely slow adding nodes, block other nodes from being added...FIXME
@@ -129,8 +145,8 @@ cluster_module_functions(Mod) ->
 % runtime_module_functions(Node, Mod) ->
 %     gen_server:call(?MODULE, {runtime_module_functions, Node, Mod}).
 
-% module_source(_Node, Module) ->
-%     get_source(Module).
+module_source(Node, Module) ->
+    gen_server:call(?MODULE, {module_source, Node, Module}).
 
 non_sys_processes(Node) ->
     gen_server:call(?MODULE, {non_sys_processes, Node}).
@@ -169,8 +185,8 @@ dump_mnesia_tables(Node, Tables) ->
 is_tracing() ->
     gen_server:call(?MODULE, is_tracing).
 
-toggle_tracing() ->
-    gen_server:call(?MODULE, toggle_tracing).
+toggle_tracing(Node) ->
+    gen_server:call(?MODULE, {toggle_tracing, Node}).
 
 cluster_application_consistency() ->
     gen_server:call(?MODULE, cluster_application_consistency).
@@ -182,7 +198,7 @@ discover_neighbour_nodes(Nodes) ->
         lists:foreach(fun(NeighbourNode) ->
             %% TODO: maybe some nodes have diff cookies...?
             %% might not be able to connect to the other nodes with orig cookie.
-            io:format("Adding node ~p ~p~n", [NeighbourNode, Cookie]),
+            logger:info(#{ adding_neighbouring_node => [Node, NeighbourNode, Cookie]}),
             ok = add_node(NeighbourNode, Cookie)
         end, Neighbours)
     end, AllNeighbours).
@@ -206,11 +222,11 @@ init({}) ->
 
     {ok, #?STATE{}}.
 
-update_state(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
+update_state(Node, #?STATE{nodes = Nodes } = State, LookupValue) ->
     case orddict:find(Node, Nodes) of
         {ok, RemoteState} ->
             {ok, Response, UpdatedRemoteState} = do_get_values(Node, RemoteState, LookupValue),
-            UpdatedState = State#?STATE{ nodes = orddict:store(Node, UpdatedRemoteState, Nodes) },
+            UpdatedState = State#?STATE{nodes = orddict:store(Node, UpdatedRemoteState, Nodes)},
             {ok, Response, UpdatedState};
         error ->
             {ok, {error, {unknown_node, Node}}, State}
@@ -218,8 +234,11 @@ update_state(Node, #?STATE{ nodes = Nodes } = State, LookupValue) ->
 
 %% TODO: rather make explicit remote update calls, update_remote_modules
 do_get_values(_Node, RemoteState, get_remote_modules) ->
+    % TODO: Unused
     RemoteModules = dict:fetch(remote_modules, RemoteState),
-    Mods = lists:sort(lists:map(fun({Mod, _Exports}) -> Mod end, RemoteModules)),
+    Mods = lists:sort(
+        lists:map(fun({Mod, _Exports}) -> Mod end, RemoteModules)
+    ),
     {ok, Mods, RemoteState};
 do_get_values(Node, RemoteState, {get_remote_module_functions, Mod}) ->
     RemoteModules = dict:fetch(remote_modules, RemoteState),
@@ -260,10 +279,10 @@ handle_call(connecting_nodes, _From, State) ->
     {reply, hawk:nodes() -- state_nodes(State), State};
 handle_call({runtime_modules, Node}, _From, State) ->
     % Update state here
-    {ok, Reply, NewState} = update_state(Node, State, get_remote_modules),
-    {reply, Reply, NewState};
-
-
+    % {ok, Reply, NewState} = update_state(Node, State, get_remote_modules),
+    % {reply, Reply, NewState};
+    ModsBin = rpc:call(Node, crell_remote, get_remote_modules2, []),
+    {reply, erlang:binary_to_term(ModsBin), State};
 handle_call(cluster_modules, _From, State) ->
     %% TODO: we need to make a update cluster_state function
     %% TODO: group erlang nodes together based on a cookie/some-family, some label??
@@ -272,7 +291,6 @@ handle_call(cluster_modules, _From, State) ->
     %% TODO: hack, just use the last Node's modules...
     LastNode = lists:last(orddict:fetch_keys(State#?STATE.nodes)),
     {ok, Reply, NewState} = update_state(LastNode, State, get_remote_modules),
-
     {reply, Reply, NewState};
 handle_call({cluster_module_functions, Mod}, _From, State) ->
     %% TODO: hack, just use the last Node's modules...
@@ -283,7 +301,28 @@ handle_call({cluster_module_functions, Mod}, _From, State) ->
 %     % Update state here
 %     {ok, Reply, _} = update_state(Node, State, {get_remote_module_functions, Mod}),
 %     {reply, Reply, State};
-
+handle_call({module_source, Node, Module}, _From, State) ->
+    %% TODO: build a function code getter. exported functions.
+    %% TODO: Add error handling
+    % logger:info(#{getting_source_for => Module }),
+    % Source = case get_source(Module) of
+    %     {ok, CodeString} ->
+    %         % logger:info(io_lib:format("~s", [CodeString])),
+    %         % {ok, list_to_binary(io_lib:format("~s", [CodeString]))};
+    %         {ok, list_to_binary(CodeString)};
+    %     X ->
+    %         logger:error(#{error => X }),
+    %         {ok, <<"error">>}
+    % end,
+    {ok, CodeString} =
+        case rpc:call(Node, crell_remote, get_source, [Module]) of
+            {ok, S} ->
+                {ok, S};
+            E ->
+                {ok, E}
+        end,
+    Source = list_to_binary(CodeString),
+    {reply, {ok, Source}, State};
 handle_call({non_sys_processes, Node}, _From, State) ->
     % Update state here
     {ok, Reply, _} = update_state(Node, State, non_sys_processes),
@@ -304,6 +343,9 @@ handle_call({pid, Node, Pid}, _From, State) ->
 handle_call({remote_which_applications, Node}, _From, State) ->
     {ok, Reply, _} = update_state(Node, State, remote_which_applications),
     {reply, Reply, State};
+handle_call({proc, Node, Pid, _Opts}, _From, State) ->
+    ProcInfo = rpc:call(Node, erlang, process_info, [Pid]),
+    {reply, ProcInfo, State};
 handle_call(E={node_connected, Node, Cookie}, _From, State) ->
     crell_notify:action({node_connecting, Node}),
     {ok, RemoteState} = start_remote_code(Node, Cookie),
@@ -313,29 +355,39 @@ handle_call(E={node_connected, Node, Cookie}, _From, State) ->
     {reply, ok, State#?STATE{
         nodes = orddict:store(Node, RemoteState2, State#?STATE.nodes)
     }};
-handle_call(E={node_disconnected, Node, Cookie}, _From, State) ->
+handle_call(E={node_disconnected, Node, _Cookie}, _From, State) ->
     crell_notify:action(E),
-    {reply, ok, State#?STATE{ nodes = orddict:erase(Node, State#?STATE.nodes) }};
+    {reply, ok, State#?STATE{nodes = orddict:erase(Node, State#?STATE.nodes)}};
 handle_call(is_tracing, _From, State) ->
     {reply, State#?STATE.tracing, State};
 %% TODO: maybe add some more conditions,
-handle_call(toggle_tracing, _From, #?STATE{tracing=true} = State) ->
-    ok = orddict:fold(fun(Node,NodeDict,ok) ->
-        % Don't match  on these calls, nodes could be added while other nodes are tracing
-        goanna_api:stop_trace(),
-        goanna_api:remove_goanna_callbacks(Node),
-        goanna_api:remove_goanna_node(Node),
-        ok
-    end, ok, State#?STATE.nodes),
-    {reply, false, State#?STATE{ tracing = false }};
-handle_call(toggle_tracing, _From, #?STATE{tracing=false} = State) ->
-    ok = orddict:fold(fun(Node,NodeDict,ok) ->
-        Cookie = dict:fetch(cookie, NodeDict),
-        goanna_api:add_node_callbacks(Node, Cookie),
-        ok
-    end, ok, State#?STATE.nodes),
-    {reply, true, State#?STATE{ tracing = true }};
-
+handle_call({toggle_tracing, Node}, _From, #?STATE{tracing=true} = State) ->
+    ok = goanna_api:stop_trace(),
+    true = goanna_api:remove_goanna_callbacks(Node),
+    ok = goanna_api:remove_goanna_node(Node),
+    {reply, false, State#?STATE{tracing = false }};
+handle_call({toggle_tracing, Node}, _From, #?STATE{tracing=false} = State) ->
+    NodeDict = orddict:fetch(Node, State#?STATE.nodes),
+    Cookie = dict:fetch(cookie, NodeDict),
+    {ok, _} = goanna_api:add_node_callbacks(Node, Cookie),
+    {reply, true, State#?STATE{tracing = true }};
+% TODO: Add cluster_tracing status
+handle_call({toggle_cluster_tracing, _Cluster}, _From, State) ->
+    %% Enable part:
+    % ok = orddict:fold(fun(Node,NodeDict,ok) ->
+    %     Cookie = dict:fetch(cookie, NodeDict),
+    %     goanna_api:add_node_callbacks(Node, Cookie),
+    %     ok
+    % end, ok, State#?STATE.nodes),
+    %% Disable part:
+    % ok = orddict:fold(fun(Node,_NodeDict,ok) ->
+    %     % Don't match  on these calls, nodes could be added while other nodes are tracing
+    %     goanna_api:stop_trace(),
+    %     goanna_api:remove_goanna_callbacks(Node),
+    %     goanna_api:remove_goanna_node(Node),
+    %     ok
+    % end, ok, State#?STATE.nodes),
+    {reply, ok, State};
 handle_call({get_db_tables, Node}, _From, State) ->
     Res = rpc:call(Node, crell_remote, get_db_tables, []),
     {reply, Res, State};
@@ -359,11 +411,11 @@ handle_call(cluster_application_consistency, _From, State) ->
                 update_state(Node, S, remote_which_applications),
             {[Reply|Replies], UpdatedState}
         end, {[], State}, State#?STATE.nodes),
-    % io:format("~p~n", [NodeReplies]),
+    logger:info(#{cluster_node_consistency => NodeReplies}),
     {reply, ok, NewState};
 
 handle_call({discover_neighbour_nodes, AllNodes}, _From,
-        #?STATE{ nodes = Nodes } = State) ->
+        #?STATE{nodes = Nodes } = State) ->
     {reply,
     lists:foldl(fun(Node, Acc) ->
         % update_state has the same lookup.. maybe abstract into 1 func call?
@@ -376,12 +428,12 @@ handle_call({discover_neighbour_nodes, AllNodes}, _From,
                     Neighbours ->
                         [{Node,
                           Cookie,
-                          lists:foldl(fun(NN, Acc) ->
+                          lists:foldl(fun(NN, NeighAcc) ->
                               case orddict:find(NN, Nodes) of
                                 error ->
-                                    [NN|Acc];
+                                    [NN|NeighAcc];
                                 {ok, _} ->
-                                    Acc
+                                    NeighAcc
                               end
                           end, [], Neighbours)
                          }|Acc]
@@ -400,19 +452,19 @@ handle_cast(_Msg, State) ->
 %% --------------------------------------------------------------------------
 
 handle_info(Info, State) ->
-    io:format("handle_info ~p\n\n", [Info]),
+    logger:info(#{ unhandled_info => Info }),
     {noreply, State}.
 %% --------------------------------------------------------------------------
 
-terminate(_Reason, #?STATE{ nodes = Nodes } = State) ->
-    orddict:fold(fun(Node=Key, RemoteStateDict, _) ->
-        %%io:format("!!!!!!!!!!!!!!!!!! ~n~n~n terminate ~p ~n~n~n", [Node]),
+terminate(_Reason, #?STATE{nodes = Nodes } = State) ->
+    orddict:fold(fun(Node, RemoteStateDict, _) ->
         Cookie = dict:fetch(cookie, RemoteStateDict),
-        E={node_disconnected, Node, Cookie}
+        _E={node_disconnected, Node, Cookie}
+        % TODO: why is this action commented?
         %% crell_notify:action(E),
         %% remove_node(Node)
     end, 0, Nodes),
-    ok.
+    logger:notice(#{terminate_state => State}).
 %% --------------------------------------------------------------------------
 
 code_change(_OldVsn, State, _Extra) ->
@@ -440,33 +492,32 @@ start_remote_code(Node,_Cookie) ->
             {ok, todo_get_remote_state}
     end.
 
--spec abstract_code(module()) -> [erl_parse:abstract_form()].
-abstract_code(Module) ->
-    File = code:which(Module),
-    {ok,{_Mod,[{abstract_code,{_Version,Forms}}]}} = beam_lib:chunks(File, [abstract_code]),
-    Forms.
-
-mod_src(Module) ->
-    Forms = abstract_code(Module),
-    lists:flatten([[erl_pp:form(F),$\n] || F <- Forms, element(1,F) =:= attribute orelse element(1,F) =:= function]).
-
-fun_src(Mod, Fun, Arity) ->
-    Forms = abstract_code(Mod),
-    [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
-    lists:flatten(erl_pp:form(FF)).
-
+% TODO: this has been moved into crell_remote.erl
+% -spec abstract_code(module()) -> [erl_parse:abstract_form()].
+% abstract_code(Module) ->
+%     File = code:which(Module),
+%     logger:info(#{ code_which => File }),
+%     {ok,{_Mod,[{abstract_code,{_Version,Forms}}]}} = beam_lib:chunks(File, [abstract_code]),
+%     Forms.
+% mod_src(Module) ->
+%     Forms = abstract_code(Module),
+%     lists:flatten([[erl_pp:form(F),$\n] || F <- Forms, element(1,F) =:= attribute orelse element(1,F) =:= function]).
+% fun_src(Mod, Fun, Arity) ->
+%     Forms = abstract_code(Mod),
+%     [FF] = [FF || FF = {function, _Line, Fun2, Arity2, _} <- Forms, Fun2 =:= Fun, Arity2 =:= Arity],
+%     lists:flatten(erl_pp:form(FF)).
 % -spec get_source(module() | {module(), function(), Arity :: non_neg_integer()}) -> {ok, string()} | {error, Reason :: any()}.
 % get_source(What) ->
-%         try
+%     try
 %         case What of
 %                 {M,F,A} ->
 %                         {ok, fun_src(M,F,A)};
 %                 Mod when is_atom(Mod)->
 %                         {ok, mod_src(Mod)}
 %         end
-%         catch _:E ->
-%                 {error, E}
-%         end.
+%         catch _:E:S ->
+%                 {error, {E, S}}
+%     end.
 
 state_nodes(State) ->
     orddict:fetch_keys(State#?STATE.nodes).

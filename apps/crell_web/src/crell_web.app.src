@@ -1,6 +1,6 @@
 {application, crell_web,
  [
-  {description, ""},
+  {description, "crell app web application"},
   {vsn, "1"},
   {registered, []},
   {applications, [

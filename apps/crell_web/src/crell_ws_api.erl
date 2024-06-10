@@ -1,5 +1,6 @@
 -module(crell_ws_api).
 
+-include_lib("kernel/include/logger.hrl").
 
 -export([init/2]).
 -export([websocket_handle/3]).
@@ -8,12 +9,16 @@
 -define(STATE, crell_ws_api).
 -record(?STATE, {}).
 
+-export([mods_json/2]).
+
 init(Req, _Opts) ->
     true = crell_notify:subscribe({node_events}),
     % process_flag(trap_exit, true),
     {cowboy_websocket, Req, #?STATE{}}.
 
 websocket_handle({text, ReqJson}, Req, State) ->
+    %% TODO: check for MFA, then just call apply?
+    %% TODO: change to maps
     case jsx:decode(ReqJson, [{return_maps, false}]) of
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"nodes">>},
@@ -61,6 +66,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 crell_web_utils:ens_atom(Node)
             ),
             ModsJson = mods_json(Mods, []),
+            % io:format("Mods Json ~p\n", [ModsJson]),
             {reply, {text, ModsJson}, Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"is_tracing">>},
@@ -68,8 +74,8 @@ websocket_handle({text, ReqJson}, Req, State) ->
             {reply, reply("is_tracing", crell_server:is_tracing()), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"toggle_tracing">>},
-         {<<"args">>,[]}] ->
-            {reply, reply("is_tracing", crell_server:toggle_tracing()), Req, State};
+         {<<"args">>,[Node]}] ->
+            {reply, reply("is_tracing", crell_server:toggle_tracing(Node)), Req, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_modules">>},
          {<<"args">>,[]}] ->
@@ -177,8 +183,20 @@ websocket_handle({text, ReqJson}, Req, State) ->
                     PageNmr
                 ),
             {reply, {text, KeysJson}, Req, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"module_source">>},
+         {<<"args">>,[Node, Module]}] ->
+            {ok, Source} = crell_server:module_source(
+                crell_web_utils:ens_atom(Node),
+                crell_web_utils:ens_atom(Module)
+            ),
+            % logger:info(#{source => Source}),
+            % Json = <<"ok">>,
+            Json = jsx:encode(#{code => Source}),
+            % logger:info(#{json => Json}),
+            {reply, {text, Json}, Req, State};
         UnknownJson ->
-            io:format("[~p] UnknownJson: ~p~n", [?MODULE,UnknownJson]),
+            logger:error(#{ unknown_json => UnknownJson }),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
             {reply, {text, Json}, Req, State}
     end.
@@ -215,7 +233,8 @@ websocket_info({timeout, _Ref, <<"nodes">>}, Req, State) ->
     NodesJson = nodes_json(),
     {reply, {text, NodesJson}, Req, State};
 websocket_info(Info, Req, State) ->
-    io:format("Info : ~p\n", [Info]),
+    % io:format("Info : ~p\n", [Info]),
+    logger:notice(#{websocket_info => Info}),
     Json = <<"reply">>,
     {reply, {text, Json}, Req, State}.
 
@@ -251,9 +270,19 @@ proc_lib_names(Name) when is_atom(Name) ->
     crell_web_utils:ens_bin(atom_to_list(Name)).
 
 mods_json([], R) ->
-    jsx:encode([{<<"mods">>, lists:reverse(R)}]);
-mods_json([H|T] , R) ->
-    mods_json(T, [list_to_binary(atom_to_list(H))|R]).
+    % Mods2 = lists:map(fun({Module, Opts}) ->
+    %     io:format("----------------------\n"),
+    %     io:format("~p", [{Module, Opts}]),
+    %     io:format("~p", [{Module, recusrive_map_to_list(Opts)}]),
+    %     _ = jsx:encode({Module, recusrive_map_to_list(Opts)}),
+    %     io:format("----------------------\n"),
+    %     {Module, Opts}
+    % end, R),
+    jsx:encode([{<<"mods">>, R}]);
+mods_json([H|T] , R) when is_atom(H) ->
+    mods_json(T, [list_to_binary(atom_to_list(H))|R]);
+mods_json([{H, Info}|T] , R) when is_atom(H) ->
+    mods_json(T, [{atom_to_binary(H), binary:list_to_bin(io_lib:format("~p", [Info]))} | R]).
 
 mod_funcs_json([], R) ->
     jsx:encode([{<<"mod_funcs">>, lists:reverse(R)}]);

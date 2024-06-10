@@ -24,6 +24,7 @@
             <li><a href="index.html">Nodes</a></li>
             <li><a href="application.html">Applications</a></li>
             <li><a href="processes.html">Processes</a></li>
+            <li><a href="processes_links.html">Processes Links</a></li>
             <li><a href="sup_tree.html">Sup Tree</a></li>
             <li><a href="db.html">DB</a></li>
             <li><a href="modules.html">modules</a></li>
@@ -33,6 +34,8 @@
         </nav>
       </div>
       <div class="container-fluid">
+
+        <!-- TODO: Add cluster drop down -->
         <div class="form-inline">
             <p>Existing nodes <select class="form-control" id="nodes"></select></p>
         </div>
@@ -41,7 +44,9 @@
             <div style="padding-bottom: 10px;">
 
                 <button class="btn btn-warning" id="enable_trc_btn">Enable tracing</button>
+                <button class="btn btn-warning" id="enable_cluster_trc_btn">Enable cluster tracing</button>
                 <button class="btn btn-warning" id="disable_trc_btn" disabled>Disable tracing</button>
+                <button class="btn btn-warning" id="disable_cluster_trc_btn" disabled>Disable cluster tracing</button>
 
                 <label for="trace_mod">Module</label>
                 <select class="form-control" id="trace_mod" disabled></select>
@@ -63,6 +68,7 @@
                 <input type="text" maxlength="4" size="4" class="form-control" id="trace_mes" />
 
                 <button class="btn btn-danger" id="traceBtn" disabled>Trace</button>
+                <button class="btn btn-danger" id="clusterTraceBtn" disabled>Cluster Trace</button>
             </div>
             <div style="padding-bottom: 10px;">
                 <label for="trace_patterns">Active Traces</label>

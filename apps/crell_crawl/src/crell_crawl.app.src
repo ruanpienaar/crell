@@ -1,6 +1,6 @@
 {application, crell_crawl,
  [
-  {description, ""},
+  {description, "Crell Code crawler application"},
   {vsn, "1"},
   {registered, []},
   {applications, [

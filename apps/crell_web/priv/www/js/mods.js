@@ -27,7 +27,6 @@
 
     function handle_message(msg){
         var json_data = JSON.parse(msg.data);
-
         if(json_data.hasOwnProperty('nodes')) {
             if(json_data.nodes.length == 0){
                 alert('First add a node.');
@@ -44,10 +43,17 @@
                 }
             }
         } else if(json_data.hasOwnProperty('mods')) {
+            $('#mods_table').empty();
             for(var n in json_data.mods){
-                $('#mods_table').append('<tr><td>'+
-                    json_data.mods[n]+'</td></tr>');
+                $('#mods_table').append('<tr>'+
+                    '<td><button onclick="get_mod_code(\''+n+'\')">Code</button></td>'+
+                    '<td>'+n+'</td>'+
+                    '<td>'+json_data.mods[n]+'</td></tr>');
             }
+        } else if(json_data.hasOwnProperty('code')){
+            var code = json_data.code
+            $('#module_source_code').empty();
+            $('#module_source_code').append(code);
         }
     }
 
@@ -60,5 +66,33 @@
         );
     };
 
+    $scope.get_mod_code = function(mod) {
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'module_source',
+                                'args':
+                                    [$('#nodes').val(), mod]
+                              })
+        );
+    }
+
+    $('#nodes').change(function(){
+        get_mods($('#nodes').val());
+    });
+
+    $('#clear_code').click(function(){
+        console.log('clear code');
+        clear_code();
+    });
+
+    function clear_code() {
+        $('#module_source_code').empty();
+    }
+
   });
+
 })();
+
+var module;
+function get_mod_code(module) {
+    angular.element(document.getElementsByTagName('body')).scope().get_mod_code(module);
+}

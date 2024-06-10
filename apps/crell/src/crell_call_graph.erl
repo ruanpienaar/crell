@@ -1,9 +1,12 @@
 -module(crell_call_graph).
+
+-include_lib("kernel/include/logger.hrl").
+
 -export([
     run/1,
     error/0
 ]).
--define(XSRV,x).
+-define(XSRV, x).
 -define(OPTS, [
      % {builtins, true} ,{recurse, true},
      {verbose, true},{warnings, true}
@@ -119,9 +122,8 @@ add_ebin(EbinPath) ->
                 io:format("~p got ~p",[?MODULE, {error, xref_base, Reason}])
         end
     catch
-        C:E ->
-            ST = erlang:get_stacktrace(),
-            io:format("~p got ~p, ~p\n~p\n",[?MODULE, C, E, ST])
+        C:E:S ->
+            logger:error(#{ c => C, e => E, s => S})
     end.
 
 module_edges(XServ, Module) ->
@@ -129,11 +131,10 @@ module_edges(XServ, Module) ->
         QueryStr = lists:flatten( io_lib:format("E | ['~p']",[Module]) ),
         {ok,Edges} = xref:q(XServ, QueryStr)
     catch
-        C:E ->
-            ST = erlang:get_stacktrace(),
-            io:format("~p got ~p, ~p\n~p\n",[?MODULE,C,E,ST]),
-            {error,[{c,C},{e,E},{stacktrace,ST}]}
+        C:E:S ->
+            logger:error(#{ c => C, e => E, s => S}),
+            {error, [{c, C},{e, E},{stacktrace, S}]}
     end.
 
 error() ->
-	io:format("Test").
+	logger:error("call graph error").
