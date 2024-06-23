@@ -45,7 +45,8 @@
     calc_proc/3,
     calc_app_env/2,
     remote_which_applications/1,
-    next_xref_branch/1
+    next_xref_branch/1,
+    remote_pid_info/2
 ]).
 
 % db
@@ -172,6 +173,9 @@ remote_which_applications(Node) ->
 %% This is to follow a function to another....
 next_xref_branch(_Node) ->
     ok.
+
+remote_pid_info(Node, Pid) ->
+    gen_server:call(?MODULE, {remote_pid_info, Node, Pid}).
 
 get_db_tables(Node) ->
     gen_server:call(?MODULE, {get_db_tables, Node}).
@@ -342,6 +346,9 @@ handle_call({pid, Node, Pid}, _From, State) ->
 handle_call({remote_which_applications, Node}, _From, State) ->
     {ok, Reply, _} = update_state(Node, State, remote_which_applications),
     {reply, Reply, State};
+handle_call({remote_pid_info, Node, Pid}, _From, State) ->
+    Reply = rpc:call(Node, erlang, process_info, [Pid]),
+    {reply, {ok, Reply}, State};
 handle_call({proc, Node, Pid, _Opts}, _From, State) ->
     ProcInfo = rpc:call(Node, erlang, process_info, [Pid]),
     {reply, ProcInfo, State};

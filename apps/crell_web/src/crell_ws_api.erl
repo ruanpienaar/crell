@@ -2,21 +2,21 @@
 
 -include_lib("kernel/include/logger.hrl").
 
--export([init/2]).
--export([websocket_handle/3]).
--export([websocket_info/3]).
+-export([
+    init/2,
+    websocket_handle/2,
+    websocket_info/2
+]).
 
 -define(STATE, crell_ws_api).
 -record(?STATE, {}).
-
--export([mods_json/2]).
 
 init(Req, _Opts) ->
     true = crell_notify:subscribe({node_events}),
     % process_flag(trap_exit, true),
     {cowboy_websocket, Req, #?STATE{}}.
 
-websocket_handle({text, ReqJson}, Req, State) ->
+websocket_handle({text, ReqJson}, State) ->
     %% TODO: check for MFA, then just call apply?
     %% TODO: change to maps
     case jsx:decode(ReqJson, [{return_maps, false}]) of
@@ -24,24 +24,24 @@ websocket_handle({text, ReqJson}, Req, State) ->
          {<<"function">>,<<"nodes">>},
          {<<"args">>,[]}] ->
             NodesJson = nodes_json(),
-            {reply, {text, NodesJson}, Req, State};
+            {reply, {text, NodesJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"connecting_nodes">>},
          {<<"args">>,[]}] ->
             ConnectingNodesJson = connecting_nodes_json(),
-            {reply, {text, ConnectingNodesJson}, Req, State};
+            {reply, {text, ConnectingNodesJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"remote_which_applications">>},
          {<<"args">>,[Node]}] ->
             NodeAppsJson = get_node_apps_json(Node),
-            {reply, {text, NodeAppsJson}, Req, State};
+            {reply, {text, NodeAppsJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"add_node">>},
          {<<"args">>,[Node, Cookie]}] ->
             ok = crell_server:add_node(crell_web_utils:ens_atom(Node),
                                        crell_web_utils:ens_atom(Cookie)),
             ConnectingNodesJson = connecting_nodes_json(),
-            {reply, {text, ConnectingNodesJson}, Req, State};
+            {reply, {text, ConnectingNodesJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,DeleteFunc},
          {<<"args">>,Nodes}] when DeleteFunc == <<"del_node">> orelse
@@ -51,14 +51,14 @@ websocket_handle({text, ReqJson}, Req, State) ->
                     crell_web_utils:ens_atom(Node)
                 )
             end, Nodes),
-            {reply, reply_ok(), Req, State};
+            {reply, reply_ok(), State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"non_sys_processes">>},
          {<<"args">>,[Node]}] ->
             PidsJson = pids_json(crell_server:non_sys_processes(
                 crell_web_utils:ens_atom(Node))
             ),
-            {reply, {text, PidsJson}, Req, State};
+            {reply, {text, PidsJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"runtime_modules">>},
          {<<"args">>,[Node]}] ->
@@ -67,21 +67,21 @@ websocket_handle({text, ReqJson}, Req, State) ->
             ),
             ModsJson = mods_json(Mods, []),
             % io:format("Mods Json ~p\n", [ModsJson]),
-            {reply, {text, ModsJson}, Req, State};
+            {reply, {text, ModsJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"is_tracing">>},
          {<<"args">>,[]}] ->
-            {reply, reply("is_tracing", crell_server:is_tracing()), Req, State};
+            {reply, reply("is_tracing", crell_server:is_tracing()), State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"toggle_tracing">>},
          {<<"args">>,[Node]}] ->
-            {reply, reply("is_tracing", crell_server:toggle_tracing(Node)), Req, State};
+            {reply, reply("is_tracing", crell_server:toggle_tracing(Node)), State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_modules">>},
          {<<"args">>,[]}] ->
             Mods = crell_server:cluster_modules(),
             ModsJson = mods_json(Mods, []),
-            {reply, {text, ModsJson}, Req, State};
+            {reply, {text, ModsJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_module_functions">>},
          {<<"args">>,[Mod]}] ->
@@ -89,7 +89,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 crell_web_utils:ens_atom(Mod)
             ),
             ModsFuncJson = mod_funcs_json(ModsFuncs, []),
-            {reply, {text, ModsFuncJson}, Req, State};
+            {reply, {text, ModsFuncJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"calc_app_env">>},
          {<<"args">>,[Node, AppName]}] ->
@@ -100,7 +100,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                     crell_web_utils:ens_atom(AppName)
                 )
             ),
-            {reply, {text, AppEnvJson}, Req, State};
+            {reply, {text, AppEnvJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"get_db_tables">>},
          {<<"args">>,[Node]}] ->
@@ -108,7 +108,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 crell_server:get_db_tables(
                     crell_web_utils:ens_atom(Node)
                 ),
-            {reply, {text, db_info_json(DbTypeTables)}, Req, State};
+            {reply, {text, db_info_json(DbTypeTables)}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"dump_ets_tables">>},
          {<<"args">>,[Node, Tbls]}] ->
@@ -122,7 +122,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 <<"ets_dl_url">>,
                 crell_web_utils:ens_atom(DLFilename)
             }]),
-            {reply, {text, DownloadJson}, Req, State};
+            {reply, {text, DownloadJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"dump_mnesia_tables">>},
          {<<"args">>,[Node, Tbls]}] ->
@@ -136,19 +136,19 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 <<"mnesia_dl_url">>,
                 crell_web_utils:ens_atom(DLFilename)
             }]),
-            {reply, {text, DownloadJson}, Req, State};
+            {reply, {text, DownloadJson}, State};
     	[{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_application_consistency">>},
          {<<"args">>,[]}] ->
             {reply, reply('cluster_application_consistency',
                          crell_server:cluster_application_consistency()),
-                Req, State};
+                State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"recon_inj_status">>},
          {<<"args">>,[]}] ->
             {reply, reply('recon_inj_status',
                           crell_server:recon_inj_status()),
-                Req, State};
+                State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"discover_neighbour_nodes">>},
          {<<"args">>,Nodes}] ->
@@ -156,7 +156,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                 [ crell_web_utils:ens_atom(Node) || Node <- Nodes ]
             ),
             NodesJson = nodes_json(),
-            {reply, {text, NodesJson}, Req, State};
+            {reply, {text, NodesJson}, State};
         [{<<"module">>,<<"crell_db">>},
          {<<"function">>,<<"ets_entries_per_page">>},
          {<<"args">>,[Node, Tbl, PageNmr]}] ->
@@ -169,7 +169,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                     ),
                     PageNmr
                 ),
-            {reply, {text, KeysJson}, Req, State};
+            {reply, {text, KeysJson}, State};
         [{<<"module">>,<<"crell_db">>},
          {<<"function">>,<<"mnesia_entries_per_page">>},
          {<<"args">>,[Node, Tbl, PageNmr]}] ->
@@ -182,7 +182,7 @@ websocket_handle({text, ReqJson}, Req, State) ->
                     ),
                     PageNmr
                 ),
-            {reply, {text, KeysJson}, Req, State};
+            {reply, {text, KeysJson}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"module_source">>},
          {<<"args">>,[Node, Module]}] ->
@@ -194,11 +194,21 @@ websocket_handle({text, ReqJson}, Req, State) ->
             % Json = <<"ok">>,
             Json = jsx:encode(#{code => Source}),
             % logger:info(#{json => Json}),
-            {reply, {text, Json}, Req, State};
+            {reply, {text, Json}, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"get_remote_pid_info">>},
+         {<<"args">>,[Node, PidStr]}] ->
+            Pid = list_to_pid(binary_to_list(PidStr)),
+            {ok, Info} = crell_server:remote_pid_info(
+                crell_web_utils:ens_atom(Node),
+                Pid
+            ),
+            Json = remote_pid_info_json(Pid, Info),
+            {reply, {text, Json}, State};
         UnknownJson ->
             logger:error(#{ unknown_json => UnknownJson }),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
-            {reply, {text, Json}, Req, State}
+            {reply, {text, Json}, State}
     end.
 
 reply_ok() ->
@@ -211,32 +221,32 @@ reply(Reply, Val) ->
 % websocket_info(nodes, Req, State) ->
 %     io:format("Websocket info nodes\n"),
 %     NodesJson = nodes_json(),
-%     {reply, {text, NodesJson}, Req, State};
+%     {reply, {text, NodesJson}, State};
 websocket_info({crell_notify,
                 {node_events},
-                {node_connecting, Node}}, Req, State) ->
+                {node_connecting, Node}}, State) ->
     {reply, {text, jsx:encode([{<<"node_connecting">>,
-                                crell_web_utils:ens_bin(Node)}])}, Req, State};
+                                crell_web_utils:ens_bin(Node)}])}, State};
 websocket_info({crell_notify,
                 {node_events},
-                {node_deleted, Node}}, Req, State) ->
+                {node_deleted, Node}}, State) ->
     {reply, {text, jsx:encode([{<<"node_deleted">>,
-                                crell_web_utils:ens_bin(Node)}])}, Req, State};
+                                crell_web_utils:ens_bin(Node)}])}, State};
 websocket_info({crell_notify,
                 {node_events},
                 {Event,Node,_Cookie}
-               }, Req, State) when Event == node_connected;
+               }, State) when Event == node_connected;
                                    Event == node_disconnected ->
     {reply, {text, jsx:encode([{crell_web_utils:ens_bin(Event),
-                                crell_web_utils:ens_bin(Node)}])}, Req, State};
-websocket_info({timeout, _Ref, <<"nodes">>}, Req, State) ->
+                                crell_web_utils:ens_bin(Node)}])}, State};
+websocket_info({timeout, _Ref, <<"nodes">>}, State) ->
     NodesJson = nodes_json(),
-    {reply, {text, NodesJson}, Req, State};
-websocket_info(Info, Req, State) ->
+    {reply, {text, NodesJson}, State};
+websocket_info(Info, State) ->
     % io:format("Info : ~p\n", [Info]),
     logger:notice(#{websocket_info => Info}),
     Json = <<"reply">>,
-    {reply, {text, Json}, Req, State}.
+    {reply, {text, Json}, State}.
 
 nodes_json() ->
     jsx:encode([{<<"nodes">>,
@@ -249,9 +259,9 @@ connecting_nodes_json() ->
 get_node_apps_json(Node) ->
     NodeApps = crell_server:remote_which_applications(crell_web_utils:ens_atom(Node)),
     NodeAppsJson = [ [{<<"name">>, crell_web_utils:ens_bin(AppName)}
-                    , {<<"erts_vsn">>, crell_web_utils:ens_bin(ErtsVsn)}
+                    , {<<"erts_vsn">>, crell_web_utils:ens_bin(Desc)}
                     , {<<"vsn">>, crell_web_utils:ens_bin(Vsn)}
-                    ] || {AppName, ErtsVsn, Vsn} <- NodeApps],
+                    ] || {AppName, Desc, Vsn} <- NodeApps],
     jsx:encode([{<<"node_apps">>, NodeAppsJson}]).
 
 pids_json(Pids) ->
@@ -398,3 +408,13 @@ mnesia_record_json(RecordCount, [], R, PageNmr) ->
     );
 mnesia_record_json(RecordCount, [H|T], R, PageNmr) ->
     mnesia_record_json(RecordCount, T, [ crell_web_utils:ens_bin(H) | R ], PageNmr).
+
+remote_pid_info_json(Pid, Info) ->
+    Data = #{
+        remote_pid_info => #{
+            pid => crell_web_utils:jsx_safe_string(Pid),
+            info => crell_web_utils:map_from_proplist_r(Info)
+        }
+    },
+    io:format("Data ~p\n", [Data]),
+    jsx:encode(Data).

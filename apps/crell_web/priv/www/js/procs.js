@@ -46,13 +46,34 @@
             $('#pids_table').empty();
             for(var n in json_data.pids){
                 var npinfo = json_data.pids[n];
+                var pid = npinfo.pid;
+                var pid2 = pid.replace('<', '')
+                var pid3 = pid2.replace('.', '')
+                var pid4 = pid3.replace('.', '')
+                var jquery_safe_pid = pid4.replace('>', '')
+                console.log(jquery_safe_pid);
                 $('#pids_table').append('<tr><td>'+
                     npinfo.pid+'</td><td>'+
                     npinfo.name+'</td><td>'+
                     npinfo.mq+'</td><td>'+
-                    '<button>TODO</button></td></tr>'
+                    '<button onclick="get_pid_info(\''+npinfo.pid+'\')">Info</button></td>'+
+                    '</td><td id="'+jquery_safe_pid+'">&nbsp;</td></tr>'
                 );
             }
+        } else if(json_data.hasOwnProperty('remote_pid_info')){
+            var pid = json_data.remote_pid_info.pid;
+            var pid2 = pid.replace('<', '')
+            var pid3 = pid2.replace('.', '')
+            var pid4 = pid3.replace('.', '')
+            var jquery_safe_pid = pid4.replace('>', '')
+            var info = json_data.remote_pid_info.info;
+            var pidhtml = '#'+jquery_safe_pid;
+            console.log(pidhtml);
+            $(pidhtml).empty();
+            console.log(info);
+            $(pidhtml).append('<p>'+JSON.stringify(info)+'</p>');
+            // console.log(pidhtml);
+            // console.log(info);
         }
     }
 
@@ -69,9 +90,24 @@
         get_pids($('#nodes').val());
     });
 
+    $scope.get_pid_info = function(pid){
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'get_remote_pid_info',
+                                'args':
+                                    [$('#nodes').val(), pid]
+                               })
+        );
+    }
+
   });
 
 })();
+
+
+var pid;
+function get_pid_info(pid) {
+    angular.element(document.getElementsByTagName('body')).scope().get_pid_info(pid);
+}
 
 
     // function github_search_link(init_call){
