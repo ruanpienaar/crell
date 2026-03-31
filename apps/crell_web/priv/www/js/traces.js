@@ -26,7 +26,12 @@
         }else{
             var json_data = JSON.parse(msg.data);
 
-            if(json_data.hasOwnProperty('traces')) {
+            // console.log(json_data);
+
+            if (json_data.msg == "ping"){
+                gws_pong();
+
+            } else if(json_data.hasOwnProperty('traces')) {
                 for(var i = 0; i < json_data['traces'].length; i++) {
                     var obj = json_data['traces'][i];
                     process_trace_obj(obj);
@@ -75,6 +80,18 @@
         console.log('GWS Websocket closed !');
     }
 
+    function ws_pong(){
+        ws.send(JSON.stringify({
+            'msg': 'pong'
+        }));
+    }
+
+    function gws_pong(){
+        gws.send(JSON.stringify({
+            'msg': 'pong'
+        }));
+    }
+
     // crell ws api
     var ws_url = "ws://"+arr[2]+"/crell/ws";
     var ws = new WebSocket(ws_url);
@@ -95,7 +112,10 @@
 
     ws.onmessage = function(msg){
         var json_data = JSON.parse(msg.data);
-        if(json_data.hasOwnProperty('nodes')) {
+        console.log(json_data);
+        if (json_data.msg == "ping"){
+            ws_pong();
+        } else if(json_data.hasOwnProperty('nodes')) {
             if(json_data.nodes.length == 0){
                 alert('First add a node.');
                 window.location.href = 'index.html'

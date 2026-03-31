@@ -27,7 +27,12 @@
 
     function handle_message(msg) {
         var json_data = JSON.parse(msg.data);
-        if(json_data.hasOwnProperty('nodes')) {
+
+        console.log(json_data);
+
+        if (json_data == {"msg":"ping"}){
+            pong();
+        } else if ( json_data.hasOwnProperty('nodes') ) {
             // TODO: fix this copy paste code
             if(json_data.nodes.length == 0){
                 alert('First add a node.');
@@ -62,6 +67,12 @@
             $('#'+a).empty();
             $('#'+a).append(json_data.app_envs);
         }
+    }
+
+    function pong(){
+        ws.send(JSON.stringify({
+            'msg': 'pong'
+        }));
     }
 
     function get_application(node){

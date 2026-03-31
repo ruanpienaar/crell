@@ -1,5 +1,7 @@
  ☐
  TODO:
+ ☐ Create text filter input for module lits and function list on trace page
+ ☐ send pings over websocket, to stop them from dying after a period of inactivity
  ☐ don't show applications in sup_tree that does not have any children IE children == [].
  ☐ [ISSUE] - remove node not working ( crell_server still has them in state
  ☐ [ISSUE] - export mnesia tables causes a big printout of mnesia info

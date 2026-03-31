@@ -4,6 +4,7 @@
 
 -export([
     init/2,
+    websocket_init/1,
     websocket_handle/2,
     websocket_info/2
 ]).
@@ -15,6 +16,10 @@ init(Req, _Opts) ->
     true = crell_notify:subscribe({node_events}),
     % process_flag(trap_exit, true),
     {cowboy_websocket, Req, #?STATE{}}.
+
+websocket_init(State) ->
+    _ = timer:send_interval(timer:seconds(5), self(), ping),
+    {[], State}.
 
 websocket_handle({text, ReqJson}, State) ->
     %% TODO: check for MFA, then just call apply?
@@ -75,7 +80,7 @@ websocket_handle({text, ReqJson}, State) ->
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"toggle_tracing">>},
          {<<"args">>,[Node]}] ->
-            {reply, reply("is_tracing", crell_server:toggle_tracing(Node)), State};
+            {reply, reply("is_tracing", crell_server:toggle_tracing(erlang:binary_to_existing_atom(Node))), State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_modules">>},
          {<<"args">>,[]}] ->
@@ -85,6 +90,7 @@ websocket_handle({text, ReqJson}, State) ->
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_module_functions">>},
          {<<"args">>,[Mod]}] ->
+           io:format("~p\n", [Mod]),
             ModsFuncs = crell_server:cluster_module_functions(
                 crell_web_utils:ens_atom(Mod)
             ),
@@ -242,6 +248,8 @@ websocket_info({crell_notify,
 websocket_info({timeout, _Ref, <<"nodes">>}, State) ->
     NodesJson = nodes_json(),
     {reply, {text, NodesJson}, State};
+websocket_info(ping, State) ->
+    {reply, {text, jsx:encode(#{msg=><<"ping">>})}, State};
 websocket_info(Info, State) ->
     % io:format("Info : ~p\n", [Info]),
     logger:notice(#{websocket_info => Info}),
@@ -289,6 +297,8 @@ mods_json([], R) ->
     %     {Module, Opts}
     % end, R),
     jsx:encode([{<<"mods">>, R}]);
+mods_json([H|T] , R) when is_list(H) ->
+    mods_json(T, [list_to_binary(H)|R]);
 mods_json([H|T] , R) when is_atom(H) ->
     mods_json(T, [list_to_binary(atom_to_list(H))|R]);
 mods_json([{H, Info}|T] , R) when is_atom(H) ->

@@ -47,7 +47,9 @@ remote_modules(Dict) ->
 % TODO: Potential Deprecate:
 get_remote_modules() ->
     % [{Mod, Mod:module_info(exports)} || {Mod, _FPath} <- code:all_loaded()].
-    [{Mod, _Functions=[]} || {Mod, _FPath} <- code:all_loaded()].
+    % TODO: all loaded should catch compiled code also.
+    % [{Mod, _Functions=[]} || {Mod, _FPath} <- code:all_loaded()].
+    [{erlang:list_to_atom(Mod), _Functions=[]} || {Mod, _FPath, _} <- code:all_available()].
 
 get_remote_modules2() ->
     erlang:term_to_binary(

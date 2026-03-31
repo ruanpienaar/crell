@@ -189,7 +189,7 @@ dump_mnesia_tables(Node, Tables) ->
 is_tracing() ->
     gen_server:call(?MODULE, is_tracing).
 
-toggle_tracing(Node) ->
+toggle_tracing(Node) when is_atom(Node) ->
     gen_server:call(?MODULE, {toggle_tracing, Node}).
 
 cluster_application_consistency() ->
@@ -375,7 +375,7 @@ handle_call({toggle_tracing, Node}, _From, #?STATE{tracing=true} = State) ->
 handle_call({toggle_tracing, Node}, _From, #?STATE{tracing=false} = State) ->
     NodeDict = orddict:fetch(Node, State#?STATE.nodes),
     Cookie = dict:fetch(cookie, NodeDict),
-    {ok, _} = goanna_api:add_node_callbacks(Node, Cookie),
+    ok = goanna_api:add_node_callbacks(Node, Cookie),
     {reply, true, State#?STATE{tracing = true }};
 % TODO: Add cluster_tracing status
 handle_call({toggle_cluster_tracing, _Cluster}, _From, State) ->

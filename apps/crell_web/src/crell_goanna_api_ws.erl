@@ -3,93 +3,115 @@
 -include_lib("kernel/include/logger.hrl").
 -include_lib("goanna/include/goanna.hrl").
 
--export([init/2]).
--export([websocket_handle/3]).
--export([websocket_info/3]).
+-export([
+    init/2,
+    websocket_init/1,
+    websocket_handle/2,
+    websocket_info/2
+]).
 
 -define(STATE, crell_goanna_api_ws).
 -record(?STATE, { polling = false,
                   list_all_active_traces_poller_ref }).
 
 
-init(Req, Opts) ->
+init(Req, _Opts) ->
     %process_flag(trap_exit, true),
     {cowboy_websocket, Req, #?STATE{}}.
 
-websocket_handle({text, ReqJson}, Req, State) ->
+websocket_init(State) ->
+    _ = timer:send_interval(timer:seconds(5), self(), ping),
+    {[], State}.
+
+websocket_handle({text, ReqJson}, State) ->
     case jsx:decode(ReqJson, [{return_maps, false}]) of
         [{<<"polling">>,<<"true">>}] ->
             poller(100),
-            {reply, {text, <<"ok">>}, Req, State#?STATE{ polling = true }};
+            {reply, {text, <<"ok">>}, State#?STATE{ polling = true }};
         [{<<"polling">>,<<"false">>}] ->
-            {reply, {text, <<"ok">>}, Req, State#?STATE{ polling = false }};
+            {reply, {text, <<"ok">>}, State#?STATE{ polling = false }};
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"pull_all_traces">>},
          {<<"args">>,[]}] ->
             % _SizeInt = list_to_integer(binary_to_list(SizeBin)),
-            Json = all_traces_json(),
-            {reply, {text, Json}, Req, State};
+            All_traces = all_traces(),
+            case All_traces of
+                [] ->
+                    {ok, State};
+                _ ->
+                    Json = all_traces_json(All_traces),
+                    {reply, {text, Json}, State}
+            end;
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"trace">>},
          {<<"args">>,[Mod,FuncAndAra,TimeSeconds,Messages]}] ->
             ok = trace(Mod,FuncAndAra,TimeSeconds,Messages),
             Json = active_traces_json(),
-            {reply, {text, Json}, Req, State};
+            {reply, {text, Json}, State};
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[]}] ->
             ok = goanna_api:stop_trace(),
             Json = active_traces_json(),
-            {reply, {text, Json}, Req,
+            {reply, {text, Json},
                 State#?STATE{list_all_active_traces_poller_ref = undefined}};
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"stop_trace">>},
          {<<"args">>,[TrcPattern]}] ->
             ok = stop_trace(trcpat_str_to_stop_mfa(TrcPattern)),
             Json = active_traces_json(),
-            {reply, {text, Json}, Req, State};
+            {reply, {text, Json}, State};
         [{<<"module">>,<<"goanna_api">>},
          {<<"function">>,<<"list_active_traces">>},
          {<<"args">>,[]}] ->
             Json = active_traces_json(),
-            {reply, {text, Json}, Req, State};
+            {reply, {text, Json}, State};
         UnknownJson ->
             logger:error(#{ unknown_json => UnknownJson }),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
-            {reply, {text, Json}, Req, State}
+            {reply, {text, Json}, State}
     end;
-websocket_handle(Data, Req, State) ->
+websocket_handle(Data, State) ->
     logger:error(#{ websocket_handle => Data }),
-    {ok, Req, State}.
+    {ok, State}.
 
-websocket_info({timeout, _Ref, <<"list_active_traces">>}, Req,
+websocket_info({timeout, _Ref, <<"list_active_traces">>},
         #?STATE{list_all_active_traces_poller_ref = undefined } = State) ->
-    {ok, Req, State};
-websocket_info({timeout, _Ref, <<"list_active_traces">>}, Req,
+    {ok, State};
+websocket_info({timeout, _Ref, <<"list_active_traces">>},
         #?STATE{list_all_active_traces_poller_ref = _ } = State) ->
     case active_traces_json() of
         <<"{\"active_traces\":[]}">> = Json ->
-            {reply, {text, Json}, Req, State#?STATE{list_all_active_traces_poller_ref = undefined}};
+            {reply, {text, Json}, State#?STATE{list_all_active_traces_poller_ref = undefined}};
         Json ->
             R = list_active_traces_poller(),
-            {reply, {text, Json}, Req, State#?STATE{list_all_active_traces_poller_ref = R}}
+            {reply, {text, Json}, State#?STATE{list_all_active_traces_poller_ref = R}}
     end;
-websocket_info({timeout, _Ref, {<<"fetch">>,_}}, Req, #?STATE{ polling = false } = State) ->
+websocket_info({timeout, _Ref, {<<"fetch">>,_}}, #?STATE{ polling = false } = State) ->
     Json = polling_end_json(),
-    {reply, {text, Json}, Req, State};
-websocket_info({timeout, _Ref, {<<"fetch">>, Ms}}, Req, #?STATE{ polling = true } = State) ->
-    Json =
-        case goanna_api:list_active_traces() of
-            [] ->
-                polling_end_json();
-            _Else ->
-                poller(Ms),
-                all_traces_json()
-        end,
-    {reply, {text, Json}, Req, State};
-websocket_info(Info, Req, State) ->
+    {reply, {text, Json}, State};
+websocket_info({timeout, _Ref, {<<"fetch">>, Ms}}, #?STATE{ polling = true } = State) ->
+    case goanna_api:list_active_traces() of
+        [] ->
+            Json = polling_end_json(),
+            {reply, {text, Json}, State};
+        _Else ->
+            poller(Ms),
+            All_traces = all_traces(),
+            case All_traces of
+                [] ->
+                    {ok, State};
+                _ ->
+                    Json = all_traces_json(All_traces),
+                    {reply, {text, Json}, State}
+            end
+    end;
+websocket_info(ping, State) ->
+    % io:format("ping!"),
+    {reply, {text, jsx:encode(#{msg=><<"ping">>})}, State};
+websocket_info(Info, State) ->
     logger:error(#{ websocket_info => Info }),
-    {ok, Req, State}.
+    {ok, State}.
 
 poller(Ms) ->
     erlang:start_timer(Ms, self(), {<<"fetch">>, Ms}).
@@ -100,7 +122,7 @@ poller(Ms) ->
 %     erlang:start_timer(Ms, self(), {<<"fetch">>, Count}).
 
 list_active_traces_poller() ->
-    LATPollerRef = erlang:start_timer(1000, self(), <<"list_active_traces">>).
+    _LATPollerRef = erlang:start_timer(1000, self(), <<"list_active_traces">>).
 
 ensure_info(T) ->
     crell_web_utils:ens_bin(io_lib:format("~p", [T])).
@@ -249,9 +271,12 @@ active_traces_json() ->
         }]
     ).
 
-    all_traces_json() ->
+    all_traces() ->
         Traces = goanna_api:pull_all_traces(),
-        jsx:encode( [{<<"traces">>, [ dbg_trace_format_to_json(T) || T <- Traces ]}] ).
+        [ dbg_trace_format_to_json(T) || T <- Traces ].
+
+    all_traces_json(All_traces) ->
+        jsx:encode( [{<<"traces">>, All_traces}] ).
 
     polling_end_json() ->
         jsx:encode([{<<"traces_polling_end">>, <<"true">>}]).
