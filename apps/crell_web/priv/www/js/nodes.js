@@ -21,6 +21,12 @@
                                     []
                                })
         );
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'clusters',
+                                'args':
+                                    []
+                               })
+        );
     };
     ws.onmessage = function(message) {
         handle_message(message);
@@ -73,10 +79,27 @@
                 $('#nodes_info_label').html('No nodes added. Add a node on this page.');
             }
             $('#conn_nodes').append('<option value='+node+' >'+node+'</option>');
+        } else if(json_data.hasOwnProperty('clusters')) {
+            $('#existing_cluster').empty();
+            $('#existing_cluster').append('<option value="">-- select existing --</option>');
+            for(var c in json_data.clusters){
+                var cluster = json_data.clusters[c];
+                $('#existing_cluster').append('<option value="'+cluster+'">'+cluster+'</option>');
+            }
+        } else if(json_data.hasOwnProperty('node_info')) {
+            var info = json_data.node_info;
+            $('#original_node').val(info.node);
+            $('#node').val(info.node);
+            $('#cookie').val(info.cookie);
+            $('#new_cluster').val(info.cluster_name);
+            $('#existing_cluster').val('');
+            $('#node_form_heading').text('Edit node');
+            $('#save_node').text('Save changes');
         } else if(json_data.hasOwnProperty('node_deleted')) {
             var node = json_data.node_deleted;
             $("#conn_nodes option[value='"+node+"']").remove();
-            if( $('#nodes').has('option').length == 0 ) {
+            $("#nodes option[value='"+node+"']").remove();
+            if( $('#nodes option').length == 0 ) {
                 $('#nodes_info_label').html('No nodes added. Add a node on this page.');
             }
         }
@@ -90,16 +113,40 @@
         save_node();
     }
 
+    function reset_form(){
+        $('#original_node').val('');
+        $('#node').val('');
+        $('#cookie').val('');
+        $('#new_cluster').val('');
+        $('#existing_cluster').val('');
+        $('#node_form_heading').text('Add a node');
+        $('#save_node').text('Save');
+    }
+
     function save_node(){
-        ws.send(JSON.stringify({'module':'crell_server',
-                                'function':'add_node',
-                                'args':
-                                    [$('#node').val(),
-                                     $('#cookie').val()]
-                               })
-        );
-        $('#node').val("");
-        $('#cookie').val("");
+        var cluster_name = $('#new_cluster').val() || $('#existing_cluster').val() || '';
+        var original = $('#original_node').val();
+        if (original) {
+            ws.send(JSON.stringify({'module':'crell_server',
+                                    'function':'edit_node',
+                                    'args':
+                                        [original,
+                                         $('#node').val(),
+                                         $('#cookie').val(),
+                                         cluster_name]
+                                   })
+            );
+        } else {
+            ws.send(JSON.stringify({'module':'crell_server',
+                                    'function':'add_node',
+                                    'args':
+                                        [$('#node').val(),
+                                         $('#cookie').val(),
+                                         cluster_name]
+                                   })
+            );
+        }
+        reset_form();
     }
 
     $('#del_node').click(function(){
@@ -115,7 +162,14 @@
     });
 
     $('#edit_node').click(function(){
-        alert('Not implemented yet.');
+        var selected = $('#nodes').val();
+        if (!selected || selected.length === 0) { alert('Select a node to edit.'); return; }
+        var node = Array.isArray(selected) ? selected[0] : selected;
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'get_node',
+                                'args': [node]
+                               })
+        );
     });
 
     $('#conn_del_node').click(function(){
@@ -131,7 +185,14 @@
     });
 
     $('#conn_edit_node').click(function(){
-        alert('Not implemented yet.');
+        var selected = $('#conn_nodes').val();
+        if (!selected || selected.length === 0) { alert('Select a node to edit.'); return; }
+        var node = Array.isArray(selected) ? selected[0] : selected;
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'get_node',
+                                'args': [node]
+                               })
+        );
     });
 
     $('#disc_neigh_nodes').click(function(){

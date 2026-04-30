@@ -23,12 +23,16 @@
 -record(?STATE, {
     nodes=orddict:new(), % orddict OF dict's (the nodes)
     tracing=false,
+    cluster_tracing=false, % false | ClusterName string
     cluster_modules
 }).
 
 -export([
     start_link/0,
     add_node/2,
+    add_node/3,
+    get_node/1,
+    edit_node/4,
     remove_node/1,
     nodes/0,
     clusters/0,
@@ -59,8 +63,9 @@
 % tracing
 -export([
     is_tracing/0,
-    toggle_tracing/1
-    % toggle_cluster_tracing/1
+    toggle_tracing/1,
+    is_cluster_tracing/0,
+    toggle_cluster_tracing/1
 ]).
 
 % % inject
@@ -89,7 +94,15 @@ start_link() ->
 
 %% TODO: extremely slow adding nodes, block other nodes from being added...FIXME
 add_node(Node, Cookie) ->
-    {atomic, ok} = crell_nodes:create(crell_nodes:new(Node, Cookie)),
+    add_node(Node, Cookie, undefined).
+
+add_node(Node, Cookie, ClusterName) ->
+    NodeRec = case ClusterName of
+        undefined -> crell_nodes:new(Node, Cookie);
+        ""        -> crell_nodes:new(Node, Cookie);
+        _         -> crell_nodes:new(Node, Cookie, ClusterName)
+    end,
+    {atomic, ok} = crell_nodes:create(NodeRec),
     ConnectedCallBack = [{crell_connect, fun() ->
         ok=gen_server:call(?MODULE, {node_connected, Node, Cookie}, infinity) end}],
     DisconnCallBack = [{crell_disconnect, fun() ->
@@ -108,12 +121,26 @@ add_node(Node, Cookie) ->
                     ok
             end;
         {error, no_such_node} ->
+            crell_notify:action({node_connecting, Node}),
             {ok,_} = hawk:add_node(Node, Cookie, ConnectedCallBack, DisconnCallBack),
             ok;
         {error, connecting} ->
             %% TODO: log that the node is connecting..
             ok
     end.
+
+get_node(Node) ->
+    crell_nodes:get(Node).
+
+edit_node(OrigNode, OrigNode, Cookie, ClusterName) ->
+    %% Node name unchanged — update in place, hawk untouched
+    {atomic, ok} = crell_nodes:update(OrigNode, Cookie, ClusterName),
+    crell_notify:action({node_edited, OrigNode}),
+    ok;
+edit_node(OrigNode, NewNode, Cookie, ClusterName) ->
+    %% Node name changed — remove old, add under new name
+    ok = remove_node(OrigNode),
+    ok = add_node(NewNode, Cookie, ClusterName).
 
 remove_node(Node) ->
     {atomic, ok} = crell_nodes:delete(Node),
@@ -192,6 +219,12 @@ is_tracing() ->
 toggle_tracing(Node) when is_atom(Node) ->
     gen_server:call(?MODULE, {toggle_tracing, Node}).
 
+is_cluster_tracing() ->
+    gen_server:call(?MODULE, is_cluster_tracing).
+
+toggle_cluster_tracing(Cluster) ->
+    gen_server:call(?MODULE, {toggle_cluster_tracing, Cluster}).
+
 cluster_application_consistency() ->
     gen_server:call(?MODULE, cluster_application_consistency).
 
@@ -221,7 +254,8 @@ init({}) ->
         NP = crell_nodes:obj_to_proplist(NodeRec),
         {node, Node} = lists:keyfind(node, 1, NP),
         {cookie, Cookie} = lists:keyfind(cookie, 1, NP),
-        ok = add_node(Node, Cookie)
+        {cluster_name, ClusterName} = lists:keyfind(cluster_name, 1, NP),
+        ok = add_node(Node, Cookie, ClusterName)
     end, crell_nodes:all()),
 
     {ok, #?STATE{}}.
@@ -377,23 +411,33 @@ handle_call({toggle_tracing, Node}, _From, #?STATE{tracing=false} = State) ->
     Cookie = dict:fetch(cookie, NodeDict),
     ok = goanna_api:add_node_callbacks(Node, Cookie),
     {reply, true, State#?STATE{tracing = true }};
-% TODO: Add cluster_tracing status
-handle_call({toggle_cluster_tracing, _Cluster}, _From, State) ->
-    %% Enable part:
-    % ok = orddict:fold(fun(Node,NodeDict,ok) ->
-    %     Cookie = dict:fetch(cookie, NodeDict),
-    %     goanna_api:add_node_callbacks(Node, Cookie),
-    %     ok
-    % end, ok, State#?STATE.nodes),
-    %% Disable part:
-    % ok = orddict:fold(fun(Node,_NodeDict,ok) ->
-    %     % Don't match  on these calls, nodes could be added while other nodes are tracing
-    %     goanna_api:stop_trace(),
-    %     goanna_api:remove_goanna_callbacks(Node),
-    %     goanna_api:remove_goanna_node(Node),
-    %     ok
-    % end, ok, State#?STATE.nodes),
-    {reply, ok, State};
+handle_call(is_cluster_tracing, _From, State) ->
+    {reply, State#?STATE.cluster_tracing, State};
+handle_call({toggle_cluster_tracing, Cluster}, _From, #?STATE{cluster_tracing=Cluster} = State) ->
+    %% Already tracing this cluster — disable
+    ClusterNodes = crell_nodes:nodes_for_cluster(Cluster),
+    lists:foreach(fun(Node) ->
+        case orddict:find(Node, State#?STATE.nodes) of
+            {ok, _} ->
+                goanna_api:stop_trace(),
+                goanna_api:remove_goanna_callbacks(Node),
+                goanna_api:remove_goanna_node(Node);
+            error -> ok
+        end
+    end, ClusterNodes),
+    {reply, false, State#?STATE{cluster_tracing = false}};
+handle_call({toggle_cluster_tracing, Cluster}, _From, #?STATE{cluster_tracing=false} = State) ->
+    %% Enable cluster tracing
+    ClusterNodes = crell_nodes:nodes_for_cluster(Cluster),
+    lists:foreach(fun(Node) ->
+        case orddict:find(Node, State#?STATE.nodes) of
+            {ok, NodeDict} ->
+                Cookie = dict:fetch(cookie, NodeDict),
+                ok = goanna_api:add_node_callbacks(Node, Cookie);
+            error -> ok
+        end
+    end, ClusterNodes),
+    {reply, Cluster, State#?STATE{cluster_tracing = Cluster}};
 handle_call({get_db_tables, Node}, _From, State) ->
     Res = rpc:call(Node, crell_remote, get_db_tables, []),
     {reply, Res, State};

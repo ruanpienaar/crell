@@ -9,8 +9,11 @@
 %% Generic
 -export([
     new/2,
+    new/3,
     create/1,
     delete/1,
+    get/1,
+    update/3,
     create_table/1,
     all/0,
     obj_to_proplist/1
@@ -18,6 +21,7 @@
 
 %% Specific
 -export([ all_clusters/0,
+          nodes_for_cluster/1,
           node_disconnected/1,
           node_connected/1
 ]).
@@ -39,6 +43,18 @@ create(Obj) ->
 
 delete(Key) ->
     mnesia:transaction(fun() -> mnesia:delete({?MODULE, Key}) end).
+
+update(Key, Cookie, ClusterName) ->
+    mnesia:transaction(fun() ->
+        [Rec] = mnesia:read(?MODULE, Key, write),
+        ok = mnesia:write(Rec#?MODULE{cookie = Cookie, cluster_name = ClusterName})
+    end).
+
+get(Key) ->
+    case mnesia:transaction(fun() -> mnesia:read(?MODULE, Key) end) of
+        {atomic, [Rec]} -> {ok, Rec};
+        {atomic, []}    -> {error, not_found}
+    end.
 
 create_table(Nodes) ->
     try
@@ -72,11 +88,15 @@ all(Key, R) ->
 obj_to_proplist(Obj) ->
     [
         {node, Obj#?MODULE.node},
-        {cookie, Obj#?MODULE.cookie}
+        {cookie, Obj#?MODULE.cookie},
+        {cluster_name, Obj#?MODULE.cluster_name}
     ].
 
 all_clusters() ->
     lists:usort([ R#?MODULE.cluster_name || R <- all() ]).
+
+nodes_for_cluster(ClusterName) ->
+    [ R#?MODULE.node || R <- all(), R#?MODULE.cluster_name == ClusterName ].
 
 node_disconnected(Key) ->
     mnesia:transaction(fun() ->

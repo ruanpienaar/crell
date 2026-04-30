@@ -14,7 +14,9 @@ action({node_disconnected, Node, Cookie}) ->
 action({node_connecting, Node}) ->
     publish({node_events}, {node_connecting, Node});
 action({node_deleted, Node}) ->
-    publish({node_events}, {node_deleted, Node}).
+    publish({node_events}, {node_deleted, Node});
+action({node_edited, Node}) ->
+    publish({node_events}, {node_edited, Node}).
 
 %% ----------
 

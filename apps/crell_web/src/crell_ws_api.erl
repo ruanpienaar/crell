@@ -41,10 +41,31 @@ websocket_handle({text, ReqJson}, State) ->
             NodeAppsJson = get_node_apps_json(Node),
             {reply, {text, NodeAppsJson}, State};
         [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"clusters">>},
+         {<<"args">>,[]}] ->
+            ClustersJson = clusters_json(),
+            {reply, {text, ClustersJson}, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"get_node">>},
+         {<<"args">>,[Node]}] ->
+            NodeAtom = crell_web_utils:ens_atom(Node),
+            {ok, NodeRec} = crell_server:get_node(NodeAtom),
+            NodeInfoJson = node_info_json(crell_nodes:obj_to_proplist(NodeRec)),
+            {reply, {text, NodeInfoJson}, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"edit_node">>},
+         {<<"args">>,[OrigNode, NewNode, Cookie, ClusterName]}] ->
+            ok = crell_server:edit_node(crell_web_utils:ens_atom(OrigNode),
+                                        crell_web_utils:ens_atom(NewNode),
+                                        crell_web_utils:ens_atom(Cookie),
+                                        binary_to_list(ClusterName)),
+            {reply, {text, clusters_json()}, State};
+        [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"add_node">>},
-         {<<"args">>,[Node, Cookie]}] ->
+         {<<"args">>,[Node, Cookie, ClusterName]}] ->
             ok = crell_server:add_node(crell_web_utils:ens_atom(Node),
-                                       crell_web_utils:ens_atom(Cookie)),
+                                       crell_web_utils:ens_atom(Cookie),
+                                       binary_to_list(ClusterName)),
             ConnectingNodesJson = connecting_nodes_json(),
             {reply, {text, ConnectingNodesJson}, State};
         [{<<"module">>,<<"crell_server">>},
@@ -81,6 +102,15 @@ websocket_handle({text, ReqJson}, State) ->
          {<<"function">>,<<"toggle_tracing">>},
          {<<"args">>,[Node]}] ->
             {reply, reply("is_tracing", crell_server:toggle_tracing(erlang:binary_to_existing_atom(Node))), State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"is_cluster_tracing">>},
+         {<<"args">>,[]}] ->
+            {reply, {text, is_cluster_tracing_json(crell_server:is_cluster_tracing())}, State};
+        [{<<"module">>,<<"crell_server">>},
+         {<<"function">>,<<"toggle_cluster_tracing">>},
+         {<<"args">>,[Cluster]}] ->
+            Result = crell_server:toggle_cluster_tracing(binary_to_list(Cluster)),
+            {reply, {text, is_cluster_tracing_json(Result)}, State};
         [{<<"module">>,<<"crell_server">>},
          {<<"function">>,<<"cluster_modules">>},
          {<<"args">>,[]}] ->
@@ -211,6 +241,8 @@ websocket_handle({text, ReqJson}, State) ->
             ),
             Json = remote_pid_info_json(Pid, Info),
             {reply, {text, Json}, State};
+        [{<<"msg">>, <<"pong">>}] ->
+            {ok, State};
         UnknownJson ->
             logger:error(#{ unknown_json => UnknownJson }),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
@@ -240,6 +272,10 @@ websocket_info({crell_notify,
                                 crell_web_utils:ens_bin(Node)}])}, State};
 websocket_info({crell_notify,
                 {node_events},
+                {node_edited, _Node}}, State) ->
+    {reply, {text, clusters_json()}, State};
+websocket_info({crell_notify,
+                {node_events},
                 {Event,Node,_Cookie}
                }, State) when Event == node_connected;
                                    Event == node_disconnected ->
@@ -263,6 +299,22 @@ nodes_json() ->
 connecting_nodes_json() ->
     jsx:encode([{<<"connecting_nodes">>,
         [ Node || Node <- crell_server:connecting_nodes() ]}]).
+
+clusters_json() ->
+    jsx:encode([{<<"clusters">>,
+        [ list_to_binary(C) || C <- crell_server:clusters() ]}]).
+
+is_cluster_tracing_json(false) ->
+    jsx:encode([{<<"is_cluster_tracing">>, false}]);
+is_cluster_tracing_json(Cluster) ->
+    jsx:encode([{<<"is_cluster_tracing">>, list_to_binary(Cluster)}]).
+
+node_info_json(Proplist) ->
+    jsx:encode([{<<"node_info">>, [
+        {<<"node">>,         crell_web_utils:ens_bin(proplists:get_value(node, Proplist))},
+        {<<"cookie">>,       crell_web_utils:ens_bin(proplists:get_value(cookie, Proplist))},
+        {<<"cluster_name">>, list_to_binary(proplists:get_value(cluster_name, Proplist, ""))}
+    ]}]).
 
 get_node_apps_json(Node) ->
     NodeApps = crell_server:remote_which_applications(crell_web_utils:ens_atom(Node)),

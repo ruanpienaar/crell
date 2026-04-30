@@ -10,6 +10,10 @@
     // $('traces_div').height(wh);
     // alert(wh);
 
+    var moduleList = [];
+    var autoScroll = true;
+    var autoCollapse = true;
+
     var url = window.location.href;
     var arr = url.split("/");
 
@@ -98,15 +102,19 @@
     ws.onopen = function(){
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'nodes',
-                                'args':
-                                    []
-                               })
+                                'args': []})
+        );
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'clusters',
+                                'args': []})
         );
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'is_tracing',
-                                'args':
-                                    []
-                               })
+                                'args': []})
+        );
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'is_cluster_tracing',
+                                'args': []})
         );
     }
 
@@ -131,8 +139,8 @@
                 $('#enable_trc_btn').attr("disabled", true);
                 $('#disable_trc_btn').attr("disabled", false);
                 $('#trace_patterns').attr("disabled", false);
-                $('#trace_mod').attr("disabled", false);
-                //$('#trace_func').attr("disabled", false);
+                $('#trace_mod_input').prop("disabled", false);
+                $('#trace_func').prop("disabled", false);
                 $('#trace_ara').attr("disabled", false);
                 $('#trace_tim').attr("disabled", false);
                 $('#trace_mes').attr("disabled", false);
@@ -162,7 +170,7 @@
                 $('#enable_trc_btn').attr("disabled", false);
                 $('#disable_trc_btn').attr("disabled", true);
                 $('#trace_patterns').attr("disabled", true);
-                $('#trace_mod').attr("disabled", true);
+                $('#trace_mod_input').prop("disabled", true);
                 $('#trace_func').attr("disabled", true);
                 $('#trace_ara').attr("disabled", true);
                 $('#trace_tim').attr("disabled", true);
@@ -179,13 +187,28 @@
                 $('#clearBtn').attr("disabled", true);
                 $('#printBtn').attr("disabled", true);
             }
+        } else if(json_data.hasOwnProperty('clusters')) {
+            $('#trace_cluster').empty();
+            for(var c in json_data.clusters){
+                var cluster = json_data.clusters[c];
+                $('#trace_cluster').append('<option value="'+cluster+'">'+cluster+'</option>');
+            }
+        } else if(json_data.hasOwnProperty('is_cluster_tracing')) {
+            if(json_data.is_cluster_tracing !== false && json_data.is_cluster_tracing !== 'false') {
+                $('#trace_cluster').val(json_data.is_cluster_tracing);
+                set_cluster_tracing_enabled();
+            } else {
+                set_cluster_tracing_disabled();
+            }
         } else if(json_data.hasOwnProperty('mods')) {
-            $('#trace_mod').empty();
-            $('#trace_mod').append('<option value="*" >*</option>');
+            moduleList = ['*'].concat(json_data['mods']);
+            $('#trace_mod_list').empty();
+            $('#trace_mod_list').append('<option value="*">');
             for(var i = 0; i < json_data['mods'].length; i++) {
                 var obj = json_data['mods'][i];
-                $('#trace_mod').append('<option value='+obj+' >'+obj+'</option>');
+                $('#trace_mod_list').append('<option value="'+obj+'">');
             }
+            $('#trace_mod_input').prop("disabled", false);
         } else if(json_data.hasOwnProperty('mod_funcs')) {
             $('#trace_func').empty();
             $('#trace_func').append('<option value="*" >*</option>');
@@ -230,20 +253,24 @@
         );
     });
 
-    $('#traceBtn').click(function(evt){
+    function send_trace(){
         start_polling();
         gws.send(JSON.stringify({'module':'goanna_api',
                                  'function':'trace',
-                                 'args':
-                                    [$('#trace_mod').val(),
-                                     $('#trace_func').val(),
-                                     // $('#trace_ara').val(),
-                                     $('#trace_tim').val(),
-                                     $('#trace_mes').val()
-                                     ]
+                                 'args': [$('#trace_mod').val(),
+                                          $('#trace_func').val(),
+                                          $('#trace_tim').val(),
+                                          $('#trace_mes').val()]
                                })
         );
+    }
 
+    $('#traceBtn').click(function(){
+        send_trace();
+    });
+
+    $('#clusterTraceBtn').click(function(){
+        send_trace();
     });
 
     $('#printBtn').click(function(){
@@ -253,6 +280,37 @@
     $('#clearBtn').click(function(){
         $('#traces_table').empty();
     });
+
+    $('#autoScrollBtn').click(function(){
+        autoScroll = !autoScroll;
+        $(this).text(autoScroll ? 'Auto-scroll: On' : 'Auto-scroll: Off');
+        $(this).toggleClass('btn-success', autoScroll).toggleClass('btn-default', !autoScroll);
+    });
+
+    $('#autoCollapseBtn').click(function(){
+        autoCollapse = !autoCollapse;
+        $(this).text(autoCollapse ? 'Auto-collapse: On' : 'Auto-collapse: Off');
+        $(this).toggleClass('btn-warning', autoCollapse).toggleClass('btn-default', !autoCollapse);
+    });
+
+    $(document).on('click', '.expand-toggle', function(e){
+        e.preventDefault();
+        var $content = $(this).prev('.cell-content');
+        var expanding = $content.hasClass('collapsed');
+        $content.toggleClass('collapsed', !expanding).toggleClass('expanded', expanding);
+        $(this).text(expanding ? 'Show less ▲' : 'Show more ▼');
+    });
+
+    function makeCodeCell(content) {
+        var cls = autoCollapse ? 'collapsed' : 'expanded';
+        var linkText = autoCollapse ? 'Show more ▼' : 'Show less ▲';
+        return '<td>' +
+            '<div class="cell-content ' + cls + '">' +
+            '<pre><code class="erlang">' + content + '</code></pre>' +
+            '</div>' +
+            '<a class="expand-toggle" href="#">' + linkText + '</a>' +
+            '</td>';
+    }
 
     $('#stopTracePatBtn').click(function(){
         if($('#trace_patterns').val() != null){
@@ -276,21 +334,64 @@
     });
 
     $('#enable_trc_btn').click(function(){
-        toggle_tracing_ws_msg(ws)
+        toggle_tracing_ws_msg(ws);
     });
     $('#disable_trc_btn').click(function(){
-        reset_inputs()
-        toggle_tracing_ws_msg(ws)
-
+        reset_inputs();
+        toggle_tracing_ws_msg(ws);
     });
 
     function toggle_tracing_ws_msg(ws) {
         ws.send(JSON.stringify({'module':'crell_server',
                                 'function':'toggle_tracing',
-                                'args':
-                                    [$('#nodes').val()]
+                                'args': [$('#nodes').val()]
                                })
-        )
+        );
+    }
+
+    $('#enable_cluster_trc_btn').click(function(){
+        var cluster = $('#trace_cluster').val();
+        if (!cluster) { alert('Select a cluster.'); return; }
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'toggle_cluster_tracing',
+                                'args': [cluster]})
+        );
+    });
+
+    $('#disable_cluster_trc_btn').click(function(){
+        var cluster = $('#trace_cluster').val();
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'toggle_cluster_tracing',
+                                'args': [cluster]})
+        );
+        reset_inputs();
+    });
+
+    function set_cluster_tracing_enabled() {
+        $('#enable_cluster_trc_btn').attr('disabled', true);
+        $('#disable_cluster_trc_btn').attr('disabled', false);
+        $('#trace_cluster').attr('disabled', true);
+        $('#clusterTraceBtn').attr('disabled', false);
+        $('#trace_mod_input').prop('disabled', false);
+        $('#trace_func').prop('disabled', false);
+        $('#trace_tim').attr('disabled', false);
+        $('#trace_mes').attr('disabled', false);
+        $('#stopTracePatBtn').attr('disabled', false);
+        $('#stopTraceBtn').attr('disabled', false);
+        $('#pollBtn').attr('disabled', false);
+        $('#fetchBtn').attr('disabled', false);
+        get_active_traces();
+        ws.send(JSON.stringify({'module':'crell_server',
+                                'function':'cluster_modules',
+                                'args': []})
+        );
+    }
+
+    function set_cluster_tracing_disabled() {
+        $('#enable_cluster_trc_btn').attr('disabled', false);
+        $('#disable_cluster_trc_btn').attr('disabled', true);
+        $('#trace_cluster').attr('disabled', false);
+        $('#clusterTraceBtn').attr('disabled', true);
     }
 
 // function message(string){
@@ -306,9 +407,10 @@
                 ' <th scope="row">'+obj['datetime']+'</th>'+
                 ' <td>'+obj.node+'</td>'+
                 ' <td>'+obj['label']+'</td>'+
-                ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
+                makeCodeCell(obj['info'])+
                 '</tr>';
                 $('#traces_table').append(table_row);
+                if(autoScroll) { var d = document.getElementById('traces_div'); d.scrollTop = d.scrollHeight; }
                 break;
             case 'trace_extra':
                 table_row=
@@ -316,10 +418,11 @@
                 ' <th scope="row">'+obj['datetime']+'</th>'+
                 ' <td>'+obj.node+'</td>'+
                 ' <td>'+obj['label']+'</td>'+
-                ' <td><pre><code class="erlang">'+obj['info']+'</code></pre></td>'+
-                ' <td><pre><code class="erlang">'+obj['extra']+'</code></pre></td>'+
+                makeCodeCell(obj['info'])+
+                makeCodeCell(obj['extra'])+
                 '</tr>';
                 $('#traces_table').append(table_row);
+                if(autoScroll) { var d = document.getElementById('traces_div'); d.scrollTop = d.scrollHeight; }
                 break;
             case 'drop':
                 console.log('Dropped '+obj['dropped']+' trace msgs.');
@@ -327,21 +430,23 @@
         }
     }
 
-    $('#trace_mod').change(function(){
-        //get_functions($('#trace_mod').val());
-        if($('#trace_mod').val() != "*"){
-            $('#traceBtn').attr("disabled", false);
-            $('#trace_func').attr("disabled", false);
+    $('#trace_mod_input').on('input change blur', function(){
+        var val = $(this).val().trim();
+        if(val === '' || moduleList.indexOf(val) === -1) {
+            $('#trace_mod').val('*');
+            $('#traceBtn').prop("disabled", true);
+            return;
+        }
+        $('#trace_mod').val(val);
+        if(val !== "*"){
+            $('#traceBtn').prop("disabled", false);
             ws.send(JSON.stringify({'module':'crell_server',
                                     'function':'cluster_module_functions',
-                                    'args':[$('#trace_mod').val()]
+                                    'args':[val]
                                   }
             ));
-        } else if($('#trace_mod').val() == "*"){
-            $('#traceBtn').attr("disabled", true);
-            $('#trace_func').attr("disabled", true);
         } else {
-            alert('panic '+$('#trace_mod').val());
+            $('#traceBtn').prop("disabled", true);
         }
     });
 
@@ -364,8 +469,11 @@
     }
 
     function reset_inputs(){
-        $('#trace_mod').empty();
-        $('#trace_mod').append('<option value="*" >*</option>');
+        moduleList = [];
+        $('#trace_mod_input').val('');
+        $('#trace_mod').val('*');
+        $('#trace_mod_list').empty();
+        $('#trace_mod_list').append('<option value="*">');
         $('#trace_func').empty();
         $('#trace_func').append('<option value="*" >*</option>');
         $('#trace_tim').empty();

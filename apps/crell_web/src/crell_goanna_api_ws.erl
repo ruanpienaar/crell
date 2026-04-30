@@ -66,6 +66,8 @@ websocket_handle({text, ReqJson}, State) ->
          {<<"args">>,[]}] ->
             Json = active_traces_json(),
             {reply, {text, Json}, State};
+        [{<<"msg">>, <<"pong">>}] ->
+            {ok, State};
         UnknownJson ->
             logger:error(#{ unknown_json => UnknownJson }),
             Json = jsx:encode([{<<"unknown_json">>, UnknownJson}]),
